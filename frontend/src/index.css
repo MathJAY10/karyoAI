@@ -1,0 +1,309 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  body {
+    background: var(--journova-card);
+    background-attachment: fixed;
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    @apply text-foreground;
+    font-feature-settings: "rlig"1, "calt"1;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Exact Journova dark background */
+.bg-journova-dark {
+  background: linear-gradient(180deg,
+      #0f1419 0%,
+      #1a1b2e 15%,
+      #1e2139 30%,
+      #252a4a 45%,
+      #2d3561 60%,
+      #3a4374 75%,
+      #4a5490 90%,
+      #5a6bb8 100%);
+  background-attachment: fixed;
+  background-size: 100% 100%;
+  min-height: 100vh;
+  width: 100vw;
+}
+
+.min-h-screen {
+  min-height: 100vh;
+  width: 100vw;
+  background: linear-gradient(180deg,
+      #0f1419 0%,
+      #1a1b2e 15%,
+      #1e2139 30%,
+      #252a4a 45%,
+      #2d3561 60%,
+      #3a4374 75%,
+      #4a5490 90%,
+      #5a6bb8 100%);
+  background-attachment: fixed;
+  background-size: 100% 100%;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Smooth transitions */
+* {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Backdrop blur */
+.backdrop-blur-sm {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.backdrop-blur-xl {
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  button,
+  a {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .backdrop-blur-sm {
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+
+  .backdrop-blur-xl {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+}
+
+/* Focus states for accessibility */
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #a855f7;
+  outline-offset: 2px;
+}
+
+/* Typography */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+/* Utility classes */
+.max-w-8xl {
+  max-width: 88rem;
+}
+
+/* Floating orbs animation */
+.floating-orb {
+  animation: float 6s ease-in-out infinite;
+}
+
+.floating-orb:nth-child(2) {
+  animation-delay: -2s;
+}
+
+.floating-orb:nth-child(3) {
+  animation-delay: -4s;
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px) translateX(0px);
+  }
+
+  33% {
+    transform: translateY(-10px) translateX(5px);
+  }
+
+  66% {
+    transform: translateY(5px) translateX(-5px);
+  }
+}
+
+/* Fade-in-up animation for AboutUs and other sections */
+@layer utilities {
+  .animate-fade-in-up {
+    opacity: 0;
+    transform: translateY(2rem);
+    animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.1s forwards;
+  }
+}
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+:root {
+  --journova-bg-1: #13141c;
+  --journova-bg-2: #181924;
+  --journova-bg-3: #18192a;
+  --journova-bg-4: #1a1b2e;
+  --journova-bg-5: #20213a;
+  --journova-bg-6: #23243a;
+  --journova-bg-7: #26263d;
+  --journova-bg-8: #292a40;
+  --journova-card: #18192a;
+  --journova-card-border-blue: linear-gradient(90deg, #3a8fff, #6be7ff);
+  --journova-card-border-yellow: linear-gradient(90deg, #ffe066, #ffb86b);
+  --journova-card-border-purple: linear-gradient(90deg, #a685ff, #ff6bcb);
+  --journova-card-border: #23243a;
+  --journova-text: #fff;
+  --journova-text-muted: #b0b3c7;
+}
+
+.bg-journova {
+  background: var(--journova-card);
+}
+
+.card-journova {
+  background: var(--journova-card);
+  color: var(--journova-text);
+  border-radius: 1.5rem;
+  border: 2px solid var(--journova-card-border);
+  box-shadow: 0 2px 24px 0 rgba(20, 20, 40, 0.12);
+}
+
+.card-border-blue {
+  border-image: var(--journova-card-border-blue) 1;
+}
+
+.card-border-yellow {
+  border-image: var(--journova-card-border-yellow) 1;
+}
+
+.card-border-purple {
+  border-image: var(--journova-card-border-purple) 1;
+}
+
+.text-journova {
+  color: var(--journova-text);
+}
+
+.text-journova-muted {
+  color: var(--journova-text-muted);
+}
+
+.custom-toast {
+  background-color: #1f2937;
+  /* A dark gray that fits the theme */
+  color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  font-family: inherit;
+  font-size: 1rem;
+  padding: 1rem;
+}
+
+.fade-in {
+  animation: fadeInAnimation 0.5s ease-in-out;
+}
+
+@keyframes fadeInAnimation {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

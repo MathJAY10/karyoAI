@@ -1,0 +1,369 @@
+import { useState, useEffect, useRef } from 'react';
+import { Send, UserCircle } from 'lucide-react';
+import { useAuth } from '../../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { useUserLimit } from '../../../lib/useUserLimit';
+import { API_BASE } from '@/lib/api';
+
+const SAMPLE_TEMPLATES = [
+  {
+    title: 'E‑commerce Conversion',
+    content: 'Create ad copy to boost conversions for our summer sale on sneakers',
+    platform: 'Meta',
+    objective: 'Conversion',
+    product: 'Sneakers Summer Collection',
+    tone: 'Urgent',
+    audience: 'Gen Z, sneakerheads'
+  },
+  {
+    title: 'SaaS Lead Gen',
+    content: 'Write LinkedIn ad copy to generate demo signups for our analytics tool',
+    platform: 'LinkedIn',
+    objective: 'Lead Generation',
+    product: 'B2B Analytics Platform',
+    tone: 'Professional',
+    audience: 'Marketing managers at mid-size companies'
+  },
+  {
+    title: 'App Installs',
+    content: 'Create ad copy to drive installs for our meditation app',
+    platform: 'Meta',
+    objective: 'App Install',
+    product: 'Meditation App',
+    tone: 'Calming',
+    audience: 'Working professionals, ages 25-40'
+  }
+];
+
+const AdCaptionGeneratorPage = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { limitReached, Snackbar, handle429Error } = useUserLimit();
+  const [chatId, setChatId] = useState<number | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [platform, setPlatform] = useState('Meta');
+  const [objective, setObjective] = useState('Conversion');
+  const [product, setProduct] = useState('');
+  const [tone, setTone] = useState('Persuasive');
+  const [audience, setAudience] = useState('');
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('accessToken');
+    return {
+      'Content-Type': 'application/json',
+      ...(token && { 'Authorization': `Bearer ${token}` })
+    };
+  };
+
+  const loadLatestChatFromServer = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/socialpro/adcaption/chats`, { headers: getAuthHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      const latest = data?.chats?.[0];
+      if (latest) {
+        setChatId(latest.id);
+        setMessages(latest.messages || []);
+        localStorage.setItem('adCaption_chatId', String(latest.id));
+      }
+    } catch (e) {
+      console.error('Failed to load latest ad caption chat:', e);
+    }
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      const lastChatId = localStorage.getItem('adCaption_chatId');
+      if (lastChatId) {
+        try {
+          const res = await fetch(`${API_BASE}/socialpro/adcaption/chat/${lastChatId}`, { headers: getAuthHeaders() });
+          if (!res.ok) throw new Error('Failed to fetch chat');
+          const data = await res.json();
+          setChatId(Number(data.chat_id));
+          setMessages(data.messages);
+        } catch (error) {
+          console.error('Failed to load chat from stored id, falling back:', error);
+          setChatId(null);
+          setMessages([]);
+          await loadLatestChatFromServer();
+        }
+      } else {
+        await loadLatestChatFromServer();
+      }
+    };
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!input.trim()) return;
+
+    const userMessage = {
+      id: Date.now(),
+      sender: 'user',
+      content: input,
+      createdAt: new Date().toISOString()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    const currentInput = input;
+    setInput('');
+    if (textareaRef.current) textareaRef.current.style.height = '44px';
+
+    setIsLoading(true);
+
+    try {
+      const res = await fetch(`${API_BASE}/socialpro/adcaption/chat/send`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ 
+          message: currentInput, 
+          chatId,
+          platform,
+          objective,
+          product,
+          tone,
+          audience
+        })
+      });
+
+      if (!res.ok) {
+        if (res.status === 401) {
+          alert('Please log in again');
+          navigate('/login');
+          return;
+        }
+        if (res.status === 404) {
+          alert('Service not available. Please try again later.');
+          return;
+        }
+      }
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setChatId(data.chat_id);
+        localStorage.setItem('adCaption_chatId', data.chat_id);
+        setMessages(data.messages);
+      } else {
+        if (data.error && data.error.toLowerCase().includes('limit')) {
+          handle429Error();
+        } else {
+          alert(data.error || 'Failed to send message');
+        }
+        setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      alert('Failed to send message. Please check your connection.');
+      setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTemplate = (template: any) => {
+    setInput(template.content);
+    setPlatform(template.platform);
+    setObjective(template.objective);
+    setProduct(template.product);
+    setTone(template.tone);
+    setAudience(template.audience);
+  };
+
+  return (
+    <div className="flex flex-col w-11/12 max-w-5xl mx-auto bg-[#181c2a] rounded-2xl shadow-2xl border border-blue-900 overflow-hidden min-h-[85vh] mt-6">
+      {Snackbar}
+
+      <div className="flex items-center gap-3 px-8 py-6 border-b border-blue-900 bg-gradient-to-r from-[#23263a] to-[#1e2235]">
+        <button
+          onClick={() => navigate('/premium/socialpro')}
+          className="p-2 rounded-lg bg-[#181c2a] hover:bg-blue-900 border border-blue-900 mr-2 transition-all duration-200 hover:scale-105"
+          aria-label="Go back"
+          title="Go back"
+        >
+          <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <div className="flex-1">
+          <h2 className="font-bold text-2xl text-white">Ad Caption Generator</h2>
+          <p className="text-sm text-blue-300">Create compelling ad copy for campaigns</p>
+        </div>
+      </div>
+
+      <div className="px-8 py-5 bg-[#23263a] border-b border-blue-900">
+        <div className="flex flex-wrap gap-6 items-center">
+          <div className="flex items-center gap-3">
+            <label htmlFor="platform-select" className="text-blue-200 text-sm font-medium">Platform:</label>
+            <select
+              id="platform-select"
+              value={platform}
+              onChange={(e) => setPlatform(e.target.value)}
+              className="px-4 py-2.5 rounded-lg border border-blue-900 bg-[#181c2a] text-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200"
+              aria-label="Select ad platform"
+            >
+              <option value="Meta">Meta</option>
+              <option value="LinkedIn">LinkedIn</option>
+              <option value="Google">Google</option>
+              <option value="Twitter">Twitter/X</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label htmlFor="objective-select" className="text-blue-200 text-sm font-medium">Objective:</label>
+            <select
+              id="objective-select"
+              value={objective}
+              onChange={(e) => setObjective(e.target.value)}
+              className="px-4 py-2.5 rounded-lg border border-blue-900 bg-[#181c2a] text-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200"
+              aria-label="Select objective"
+            >
+              <option value="Conversion">Conversion</option>
+              <option value="Awareness">Awareness</option>
+              <option value="Lead Generation">Lead Generation</option>
+              <option value="App Install">App Install</option>
+              <option value="Traffic">Traffic</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label htmlFor="product-input" className="text-blue-2 00 text-sm font-medium">Product/Service:</label>
+            <input
+              id="product-input"
+              type="text"
+              placeholder="e.g., Summer Shoe Collection"
+              value={product}
+              onChange={(e) => setProduct(e.target.value)}
+              className="px-4 py-2.5 rounded-lg border border-blue-900 bg-[#181c2a] text-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 placeholder-blue-400 transition-all duration-200"
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label htmlFor="tone-select" className="text-blue-200 text-sm font-medium">Tone:</label>
+            <select
+              id="tone-select"
+              value={tone}
+              onChange={(e) => setTone(e.target.value)}
+              className="px-4 py-2.5 rounded-lg border border-blue-900 bg-[#181c2a] text-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-200"
+              aria-label="Select ad tone"
+            >
+              <option value="Persuasive">Persuasive</option>
+              <option value="Urgent">Urgent</option>
+              <option value="Friendly">Friendly</option>
+              <option value="Professional">Professional</option>
+              <option value="Playful">Playful</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label htmlFor="audience-input" className="text-blue-200 text-sm font-medium">Audience:</label>
+            <input
+              id="audience-input"
+              type="text"
+              placeholder="e.g., First-time parents, small business owners"
+              value={audience}
+              onChange={(e) => setAudience(e.target.value)}
+              className="px-4 py-2.5 rounded-lg border border-blue-900 bg-[#181c2a] text-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 placeholder-blue-400 transition-all duration-200"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="px-8 py-4 bg-[#23263a] border-b border-blue-900">
+        <div className="mb-3 text-blue-200 font-semibold text-sm">Popular Templates:</div>
+        <div className="flex flex-wrap gap-3">
+          {SAMPLE_TEMPLATES.map((tpl, idx) => (
+            <button
+              key={idx}
+              className="px-4 py-2.5 rounded-lg border border-blue-900 bg-[#181c2a] text-blue-100 hover:bg-blue-900 hover:text-white transition-all duration-200 text-sm font-medium hover:scale-105 transform"
+              onClick={() => handleTemplate(tpl)}
+              type="button"
+            >
+              {tpl.title}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-8 py-8 space-y-6 bg-[#181c2a]">
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-blue-300">
+            <p className="text-lg font-medium">Start by selecting a template or describing your ad brief below.</p>
+            <p className="text-sm text-blue-400 mt-2">Choose platform, objective, product, tone and audience for best results.</p>
+          </div>
+        ) : (
+          messages.map((msg, idx) => (
+            <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'} items-end`}>
+              <div className={`max-w-[80%] px-5 py-4 rounded-2xl shadow-lg text-base ${msg.sender === 'user' ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-br-md' : 'bg-[#23263a] text-blue-100 rounded-bl-md border border-blue-800'}`}>
+                <div className="whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+              </div>
+              {msg.sender === 'user' && (
+                <div className="flex-shrink-0 ml-3">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center border-2 border-blue-400 bg-gradient-to-r from-indigo-500 to-purple-600">
+                    {user?.username ? (
+                      <span className="text-white font-bold text-sm">{user.username[0].toUpperCase()}</span>
+                    ) : (
+                      <UserCircle className="w-6 h-6 text-blue-200" />
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+        {isLoading && (
+          <div className="flex justify-start items-end">
+            <div className="max-w-[80%] px-5 py-4 rounded-2xl shadow-lg text-base bg-[#23263a] text-blue-100 rounded-bl-md border border-blue-800 flex items-center">
+              <span className="mr-2">Crafting ad variations</span>
+              <div className="flex space-x-1">
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              </div>
+            </div>
+          </div>
+        )}
+        <div ref={chatEndRef} />
+      </div>
+
+      <div className="px-8 py-6 bg-[#23263a] flex items-center gap-3">
+        <textarea
+          ref={textareaRef}
+          className="flex-1 px-5 py-3 rounded-lg border border-blue-900 bg-[#181c2a] text-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 resize-none min-h-[48px] max-h-48 transition-all duration-200"
+          placeholder="Describe your ad brief or what you want to promote..."
+          value={input}
+          onChange={e => {
+            setInput(e.target.value);
+            e.target.style.height = 'auto';
+            e.target.style.height = Math.min(e.target.scrollHeight, 192) + 'px';
+          }}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          disabled={isLoading || limitReached}
+          rows={1}
+        />
+        <button
+          onClick={handleSend}
+          className="px-6 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 hover:scale-105 transform"
+          disabled={!input.trim() || isLoading || limitReached}
+          title="Send message"
+        >
+          <Send className="w-5 h-5" />
+          <span>Send</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+
+export default AdCaptionGeneratorPage;
+
+

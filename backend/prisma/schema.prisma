@@ -1,0 +1,488 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                         Int                         @id @default(autoincrement())
+  username                   String                      @unique @db.VarChar(32)
+  email                      String                      @unique @db.VarChar(255)
+  password                   String?                     @db.VarChar(255)
+  role                       UserRole                    @default(USER)
+  subscriptionStart          DateTime?
+  expiry                     DateTime?
+  plan                       Plan                        @default(Free)
+  active                     Boolean                     @default(true)
+  messageLimit               Int                         @default(50)
+  emailLimit                 Int                         @default(50)
+  createdAt                  DateTime                    @default(now()) @map("created_at")
+  googleId                   String?                     @unique
+  aiWorkmatePrompts          AIWorkmatePrompt[]
+  chats                      Chat[]
+  excelAnalyses              ExcelAnalysis[]
+  mailChats                  MailChat[]
+  mailTemplates              MailTemplate[]
+  payments                   Payment[]
+  pdfChats                   PdfChat[]
+  subjectLineChats           SubjectLineChat[]
+  tonePolisherChats          TonePolisherChat[]
+  offerLetters               OfferLetter[]
+  smartInvoices              SmartInvoice[]
+  socialMediaCaptions        SocialMediaCaptionChat[]
+  hashtagStrategists         HashtagStrategistChat[]
+  adCaptions                 AdCaptionChat[]
+  captionRewriterChat        CaptionRewriterChat[]
+  smartDataExtractorSessions SmartDataExtractorSession[]
+  mailMergeAIChats           MailMergeAIChat[]
+
+  @@map("users")
+}
+
+model Admin {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique @db.VarChar(32)
+  password  String   @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("admins")
+}
+
+model Payment {
+  id                Int       @id @default(autoincrement())
+  userId            Int       @map("user_id")
+  razorpayOrderId   String    @unique @map("razorpay_order_id") @db.VarChar(64)
+  razorpayPaymentId String?   @map("razorpay_payment_id") @db.VarChar(64)
+  amount            Int
+  plan              String    @default("premium") @db.VarChar(64)
+  status            String    @db.VarChar(32)
+  paidAt            DateTime? @map("paid_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("payments")
+}
+
+model RazorpayOrder {
+  id        Int      @id @default(autoincrement())
+  orderId   String   @unique @map("razorpay_order_id") @db.VarChar(64)
+  amount    Int
+  planId    String   @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("razorpay_orders")
+}
+
+model ExcelAnalysis {
+  id          Int      @id @default(autoincrement())
+  userId      Int?     @map("user_id")
+  fileName    String?  @map("file_name") @db.VarChar(255)
+  fileSize    Int?     @map("file_size")
+  fileType    String?  @map("file_type") @db.VarChar(64)
+  errors      Json?
+  trends      Json?
+  insight     String?  @db.Text
+  chatHistory Json?    @map("chat_history")
+  createdAt   DateTime @default(now()) @map("created_at")
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("excel_analysis_results")
+}
+
+model AIWorkmatePrompt {
+  id        Int      @id @default(autoincrement())
+  userId    Int?     @map("user_id")
+  title     String   @db.VarChar(255)
+  prompt    String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("aiworkmate_prompts")
+}
+
+model Chat {
+  id        Int           @id @default(autoincrement())
+  userId    Int           @map("user_id")
+  toolType  ToolType      @map("tool_type")
+  title     String?       @db.VarChar(255)
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  messages  ChatMessage[]
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("chats")
+}
+
+model ChatMessage {
+  id        Int      @id @default(autoincrement())
+  chatId    Int      @map("chat_id")
+  sender    Sender
+  content   String   @db.Text
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@map("chat_messages")
+}
+
+model PdfChat {
+  id        Int              @id @default(autoincrement())
+  userId    Int              @map("user_id")
+  fileName  String?          @map("file_name") @db.VarChar(255)
+  fileSize  Int?             @map("file_size")
+  fileType  String?          @map("file_type") @db.VarChar(64)
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  PdfChatMessage[]
+
+  @@index([userId])
+  @@map("pdfchat")
+}
+
+model PdfChatMessage {
+  id        Int      @id @default(autoincrement())
+  chatId    Int      @map("chat_id")
+  sender    Sender
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  chat      PdfChat  @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@map("pdfchat_messages")
+}
+
+model MailChat {
+  id        Int               @id @default(autoincrement())
+  userId    Int               @map("user_id")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  MailChatMessage[]
+
+  @@index([userId])
+  @@map("mailchat")
+}
+
+model MailChatMessage {
+  id        Int      @id @default(autoincrement())
+  chatId    Int      @map("chat_id")
+  sender    Sender
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  chat      MailChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@map("mailchat_messages")
+}
+
+model SubjectLineChat {
+  id        Int                      @id @default(autoincrement())
+  userId    Int                      @map("user_id")
+  createdAt DateTime                 @default(now()) @map("created_at")
+  updatedAt DateTime                 @updatedAt @map("updated_at")
+  user      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  SubjectLineChatMessage[]
+
+  @@index([userId])
+  @@map("subjectlinechat")
+}
+
+model SubjectLineChatMessage {
+  id        Int             @id @default(autoincrement())
+  chatId    Int             @map("chat_id")
+  sender    Sender
+  content   String          @db.Text
+  createdAt DateTime        @default(now()) @map("created_at")
+  chat      SubjectLineChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@map("subjectlinechat_messages")
+}
+
+model TonePolisherChat {
+  id        Int                       @id @default(autoincrement())
+  userId    Int                       @map("user_id")
+  createdAt DateTime                  @default(now()) @map("created_at")
+  updatedAt DateTime                  @updatedAt @map("updated_at")
+  user      User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  TonePolisherChatMessage[]
+
+  @@index([userId])
+  @@map("tonepolisherchat")
+}
+
+model TonePolisherChatMessage {
+  id        Int              @id @default(autoincrement())
+  chatId    Int              @map("chat_id")
+  sender    Sender
+  content   String           @db.Text
+  createdAt DateTime         @default(now()) @map("created_at")
+  chat      TonePolisherChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@map("tonepolisherchat_messages")
+}
+
+model OfferLetter {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  title     String?  @db.VarChar(255)
+  data      Json
+  logo      String?  @db.Text  // Changed from @db.LongText
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("offer_letters")
+}
+
+model SmartInvoice {
+  id                  Int           @id @default(autoincrement())
+  userId              Int           @map("user_id")
+  businessName        String        @db.VarChar(255)
+  businessLogo        String?       @db.Text  // Changed from @db.LongText
+  clientName          String        @db.VarChar(255)
+  clientEmail         String?       @db.VarChar(255)
+  businessAddress     String?       @db.VarChar(255)
+  clientAddress       String?       @db.VarChar(255)
+  clientPhoneNumber   String?       @db.VarChar(255)
+  businessEmail       String?       @db.VarChar(255)
+  businessPhoneNumber String?       @db.VarChar(255)
+  subtotal            Float
+  taxAmount           Float
+  grandTotal          Float
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items               InvoiceItem[]
+
+  @@index([userId])
+  @@map("smart_invoices")
+}
+
+model InvoiceItem {
+  id            Int          @id @default(autoincrement())
+  invoiceId     Int          @map("invoice_id")
+  itemName      String       @db.VarChar(255)
+  rate          Float
+  quantity      Int
+  taxPercentage Float
+  finalPrice    Float
+  invoice       SmartInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_items")
+}
+
+model SocialMediaCaptionChat {
+  id        Int                             @id @default(autoincrement())
+  userId    Int                             @map("user_id")
+  platform  String                          @db.VarChar(50)
+  industry  String?                         @db.VarChar(100)
+  tone      String?                         @db.VarChar(50)
+  createdAt DateTime                        @default(now()) @map("created_at")
+  updatedAt DateTime                        @updatedAt @map("updated_at")
+  user      User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  SocialMediaCaptionChatMessage[]
+
+  @@index([userId])
+  @@map("socialmedia_caption_chat")
+}
+
+model SocialMediaCaptionChatMessage {
+  id        Int                    @id @default(autoincrement())
+  chatId    Int                    @map("chat_id")
+  sender    Sender
+  content   String                 @db.Text
+  metadata  Json?                  @map("metadata")
+  createdAt DateTime               @default(now()) @map("created_at")
+  chat      SocialMediaCaptionChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@map("socialmedia_caption_chat_messages")
+}
+
+model HashtagStrategistChat {
+  id        Int                            @id @default(autoincrement())
+  userId    Int                            @map("user_id")
+  platform  String                         @db.VarChar(50)
+  industry  String?                        @db.VarChar(100)
+  content   String?                        @db.Text
+  createdAt DateTime                       @default(now()) @map("created_at")
+  updatedAt DateTime                       @updatedAt @map("updated_at")
+  user      User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  HashtagStrategistChatMessage[]
+
+  @@index([userId])
+  @@map("hashtag_strategist_chat")
+}
+
+model HashtagStrategistChatMessage {
+  id        Int                   @id @default(autoincrement())
+  chatId    Int                   @map("chat_id")
+  sender    Sender
+  content   String                @db.Text
+  metadata  Json?                 @map("metadata")
+  createdAt DateTime              @default(now()) @map("created_at")
+  chat      HashtagStrategistChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@map("hashtag_strategist_chat_messages")
+}
+
+model AdCaptionChat {
+  id        Int                    @id @default(autoincrement())
+  userId    Int                    @map("user_id")
+  platform  String                 @db.VarChar(50)
+  objective String?                @db.VarChar(100)
+  product   String?                @db.VarChar(255)
+  tone      String?                @db.VarChar(50)
+  audience  String?                @db.VarChar(255)
+  createdAt DateTime               @default(now()) @map("created_at")
+  updatedAt DateTime               @updatedAt @map("updated_at")
+  user      User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  AdCaptionChatMessage[]
+
+  @@index([userId])
+  @@map("ad_caption_chat")
+}
+
+model AdCaptionChatMessage {
+  id        Int           @id @default(autoincrement())
+  chatId    Int           @map("chat_id")
+  sender    Sender
+  content   String        @db.Text
+  metadata  Json?         @map("metadata")
+  createdAt DateTime      @default(now()) @map("created_at")
+  chat      AdCaptionChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@map("ad_caption_chat_messages")
+}
+
+model CaptionRewriterChat {
+  id        Int                          @id @default(autoincrement())
+  userId    Int                          @map("user_id")
+  createdAt DateTime                     @default(now()) @map("created_at")
+  updatedAt DateTime                     @updatedAt @map("updated_at")
+  user      User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  CaptionRewriterChatMessage[]
+
+  @@index([userId])
+  @@map("caption_rewriter_chat")
+}
+
+model CaptionRewriterChatMessage {
+  id        Int                 @id @default(autoincrement())
+  chatId    Int                 @map("chat_id")
+  sender    Sender
+  content   String              @db.Text
+  createdAt DateTime            @default(now()) @map("created_at")
+  chat      CaptionRewriterChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@map("caption_rewriter_chat_messages")
+}
+
+model SmartDataExtractorSession {
+  id        Int                         @id @default(autoincrement())
+  userId    Int                         @map("user_id")
+  fileName  String?                     @map("file_name") @db.VarChar(255)
+  fileSize  Int?                        @map("file_size")
+  fileType  String?                     @map("file_type") @db.VarChar(64)
+  pdfText   String?                     @db.Text  // Changed from @db.LongText
+  createdAt DateTime                    @default(now()) @map("created_at")
+  updatedAt DateTime                    @updatedAt @map("updated_at")
+  user      User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  SmartDataExtractorMessage[]
+
+  @@index([userId])
+  @@map("smartdataextractor_session")
+}
+
+model SmartDataExtractorMessage {
+  id        Int                       @id @default(autoincrement())
+  sessionId Int                       @map("session_id")
+  sender    Sender
+  content   String                    @db.Text
+  createdAt DateTime                  @default(now()) @map("created_at")
+  session   SmartDataExtractorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("smartdataextractor_message")
+}
+
+model MailMergeAIChat {
+  id        Int                      @id @default(autoincrement())
+  userId    Int                      @map("user_id")
+  createdAt DateTime                 @default(now()) @map("created_at")
+  updatedAt DateTime                 @updatedAt @map("updated_at")
+  user      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  MailMergeAIChatMessage[]
+
+  @@index([userId])
+  @@map("mailmergeaichat")
+}
+
+model MailMergeAIChatMessage {
+  id        Int             @id @default(autoincrement())
+  chatId    Int             @map("chat_id")
+  sender    Sender
+  content   String          @db.Text
+  metadata  Json?
+  createdAt DateTime        @default(now()) @map("created_at")
+  chat      MailMergeAIChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
+  @@map("mailmergeaichat_messages")
+}
+
+model MailTemplate {
+  id          Int      @id @default(autoincrement())
+  userId      Int?     @map("user_id")
+  title       String   @db.VarChar(255)
+  subject     String?  @db.VarChar(255)
+  description String?  @db.VarChar(1024)
+  body        String   @db.Text
+  category    String?  @db.VarChar(100)
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, title], map: "mail_templates_userId_title_key")
+  @@index([userId])
+  @@map("mail_templates")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum Plan {
+  Free
+  Paid
+}
+
+enum ToolType {
+  formula_master
+  sheet_summarizer
+  ai_workmate
+}
+
+enum Sender {
+  user
+  bot
+}

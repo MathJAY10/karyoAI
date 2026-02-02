@@ -1,0 +1,70 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: karyoai_postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=karyoai
+      - POSTGRES_PASSWORD=karyoai_secure_password
+      - POSTGRES_DB=karyoai
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U karyoai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - karyoai-network
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: karyoai_ollama
+    ports:
+      - "18080:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      - OLLAMA_KEEP_ALIVE=30m
+    restart: unless-stopped
+    networks:
+      - karyoai-network
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        ollama serve &
+        pid=$$!
+        sleep 10
+        ollama pull llama3.2:latest
+        wait $$pid
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: karyoai_chroma
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - CHROMA_SERVER_AUTH_CREDENTIALS_PROVIDER=chromadb.auth.token_authn.TokenAuthenticationServerProvider
+      - CHROMA_SERVER_AUTH_CREDENTIALS=karyoai_secret_token
+      - CHROMA_SERVER_AUTH_PROVIDER=chromadb.auth.token_authn.TokenAuthServerProvider
+    restart: unless-stopped
+    networks:
+      - karyoai-network
+
+volumes:
+  postgres_data:
+    driver: local
+  ollama_data:
+    driver: local
+  chroma_data:
+    driver: local
+
+networks:
+  karyoai-network:
+    driver: bridge

@@ -1,0 +1,10 @@
+# llm-service/llm-ms/.gitignore
+venv/
+__pycache__/
+*.pyc
+
+*.log
+.DS_Store
+*.egg-info/
+dist/
+build/

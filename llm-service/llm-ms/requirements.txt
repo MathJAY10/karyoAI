@@ -1,0 +1,20 @@
+# llm-service/requirements.txt
+# filepath: c:\Users\abhin\OneDrive\Desktop\karyoAI\llm-service\llm-ms\requirements.txt
+
+# Core Framework
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+
+# Environment & Config
+python-dotenv==1.0.1
+pydantic==2.10.2
+pydantic-settings==2.6.1
+
+# HTTP Clients
+requests==2.32.3
+
+aiohttp==3.11.7
+
+# Optional but Recommended
+httpx==0.28.0          # Modern async HTTP client (alternative to requests)
+python-multipart==0.0.17  # For file uploads if needed

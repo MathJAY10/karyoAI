@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+
+# Block query-param variants to avoid duplicate content
+Disallow: /*?
+
+Sitemap: https://www.karyoai.com/sitemap.xml
+
+
