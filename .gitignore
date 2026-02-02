@@ -6,3 +6,5 @@
 /backend/node_modules
 **/node_modules/
 .cursorignore
+.env
+backend/.env
