@@ -1,6 +1,8 @@
 # KaryoAI - AI-Powered Productivity Suite
 
-A comprehensive AI-powered platform with multiple tools
+A comprehensive AI-powered platform with multiple tools and **Retrieval-Augmented Generation (RAG)** for semantic document understanding.
+
+> **🎯 New**: Full RAG pipeline implemented! See [RAG Quick Start](backend/RAG_QUICK_START.md)
 ## 🚀 Quick Start
 
 ### Prerequisites

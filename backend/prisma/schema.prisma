@@ -38,6 +38,8 @@ model User {
   captionRewriterChat        CaptionRewriterChat[]
   smartDataExtractorSessions SmartDataExtractorSession[]
   mailMergeAIChats           MailMergeAIChat[]
+  mailTemplates              MailTemplate[]
+  documents                  Document[]
 
   @@map("users")
 }
@@ -464,6 +466,43 @@ model MailTemplate {
   @@unique([userId, title], map: "mail_templates_userId_title_key")
   @@index([userId])
   @@map("mail_templates")
+}
+
+model Document {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @map("user_id")
+  fileName      String   @map("file_name") @db.VarChar(255)
+  fileType      String   @map("file_type") @db.VarChar(64)
+  filePath      String?  @map("file_path") @db.VarChar(255)
+  fileSize      Int?     @map("file_size")
+  chromaId      String?  @map("chroma_id") @db.VarChar(255)
+  collectionId  String?  @map("collection_id") @db.VarChar(255)
+  status        String   @default("pending") @db.VarChar(64)
+  totalChunks   Int      @default(0) @map("total_chunks")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chunks        Chunk[]
+
+  @@index([userId])
+  @@index([chromaId])
+  @@map("documents")
+}
+
+model Chunk {
+  id          Int      @id @default(autoincrement())
+  documentId  Int      @map("document_id")
+  chunkNumber Int      @map("chunk_number")
+  text        String   @db.Text
+  chromaId    String?  @map("chroma_id") @db.VarChar(255)
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, chunkNumber], map: "chunks_documentId_chunkNumber_key")
+  @@index([documentId])
+  @@index([chromaId])
+  @@map("chunks")
 }
 
 enum UserRole {
