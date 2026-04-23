@@ -19,6 +19,11 @@ CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "200"))
 class EmbeddingService:
     """Service to generate embeddings using Ollama"""
 
+    # Expose config values on the class for health/status routes.
+    EMBEDDING_MODEL = EMBEDDING_MODEL
+    CHUNK_SIZE = CHUNK_SIZE
+    CHUNK_OVERLAP = CHUNK_OVERLAP
+
     @staticmethod
     def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> List[Tuple[str, int]]:
         """
@@ -32,9 +37,13 @@ class EmbeddingService:
         Returns:
             List of (chunk_text, chunk_number) tuples
         """
+        if not text or not text.strip():
+            return []
+
         chunks = []
         chunk_number = 0
         start = 0
+        step = max(chunk_size - overlap, 1)
         
         while start < len(text):
             end = min(start + chunk_size, len(text))
@@ -44,10 +53,11 @@ class EmbeddingService:
                 chunks.append((chunk, chunk_number))
                 chunk_number += 1
             
-            # Move forward by (chunk_size - overlap)
-            start = end - overlap
-            if start >= len(text):
+            # Move forward by the non-overlapping step and stop at the end of the text
+            if end >= len(text):
                 break
+
+            start += step
         
         return chunks
 

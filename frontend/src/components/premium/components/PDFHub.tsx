@@ -1,6 +1,6 @@
 import React from 'react';
 import ToolCard from './ToolCard';
-import { FileText, MessageSquare, Database, FileDown, FolderOpen } from 'lucide-react';
+import { FileText, MessageSquare, FileDown } from 'lucide-react';
 import { useOutletContext, useNavigate } from 'react-router-dom';
 
 interface PDFHubProps {

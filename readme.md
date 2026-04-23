@@ -81,10 +81,10 @@ pip install -r requirements.txt
 
 
 # Start FastAPI server
-uvicorn app.main:app --reload --port 8000
+python run.py
 ```
 
-LLM Service will run on: `http://localhost:8000`
+LLM Service will run on: `http://localhost:8001`
 
 ### 5. Setup Frontend
 

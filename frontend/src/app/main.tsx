@@ -1,4 +1,3 @@
-import React from "react";
 import { MainHero } from "@/components/homepage/main-hero";
 import { CustomerStoriesSection } from "@/components/homepage/CustomerStoriesSection";
 

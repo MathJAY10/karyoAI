@@ -13,6 +13,7 @@ app.use(helmet());
 const allowedOrigins = [
   'https://karyoai.com',
   'https://www.karyoai.com',
+  'https://hoppscotch.io',
   'http://localhost:3000',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
@@ -40,105 +41,106 @@ app.get('/api/health', (req: Request, res: Response) => res.json({
   status: 'ok server is running'
 }));
 
-// Route imports with error handling
-try {
-  // Import routes
-  const userRoutes = require('./routes/user').default;
-  
-  const adminRoutes = require('./routes/admin').default;
-  
-  const premiumRoutes = require('./routes/premium').default;
-  
-  const razorpayRoutes = require('./routes/razorpay').default;
-  
-  const aiRoutes = require('./routes/excel/ai').default;
-  const aiFormulaRoutes = require('./routes/excel/aiFormula').default;
-  const chatRoutes = require('./routes/excel/chat').default;
-  const errorTrendRoutes = require('./routes/excel/errorTrend').default;
-  const captionRewriterRoutes = require('./routes/socialpro/captionRewriter').default;
-  const aiworkmateChatRoutes = require('./routes/aiworkmate/aiworkmatechat').default;
-  const aiworkmatePromptRoutes = require('./routes/aiworkmate/prompt').default;
-  
-  const pdfBrainRoutes = require('./routes/pdf/pdfBrainRoutes').default;
-  const pdfChatAgentRoutes = require('./routes/pdf/pdfChatAgentRoutes').default;
-  const pdfChartRoutes = require('./routes/pdf/pdfChartRoutes').default;
-  const smartDataExtractorRoutes = require('./routes/pdf/smartDataExtractor').default;
-  const offerLetterRoutes = require('./routes/smartdocs/offerletter').default;
-  const smartInvoiceRoutes = require('./routes/smartdocs/smartinvoice').default;
-  const pdfConverterProRoutes = require('./routes/pdf/pdfConverterPro').default;
-  const bulkmailerExcelEngineRoutes = require('./routes/bulkmailer/excelEngine').default;
-  const mailmergeRoutes = require('./routes/bulkmailer/mailmerge').default;
-  const smartTemplatesRoutes = require('./routes/bulkmailer/smartTemplates').default;
-  // Critical: Import mailcraft routes with detailed logging
-  const mailcraftRoutes = require('./routes/mailcraft/emailwizard').default;
-  console.log('Mailcraft routes imported successfully:', typeof mailcraftRoutes);
-  
-  const subjectLineOptimizerRoutes = require('./routes/mailcraft/subjectlineoptimizer').default;
-  console.log('Subject line optimizer routes imported successfully:', typeof subjectLineOptimizerRoutes);
-  
-  const tonePolisherRoutes = require('./routes/mailcraft/tonepolisher').default;
-  console.log('Tone polisher routes imported successfully:', typeof tonePolisherRoutes);
-  
-  // Import socialpro routes
-  const captionProRoutes = require('./routes/socialpro/captionPro').default;
-  console.log('CaptionPro routes imported successfully:', typeof captionProRoutes);
-  
-  const hashtagStrategistRoutes = require('./routes/socialpro/hashtagStrategist').default;
-  console.log('Hashtag Strategist routes imported successfully:', typeof hashtagStrategistRoutes);
-  const adCaptionRoutes = require('./routes/socialpro/adCaption').default;
-  console.log('Ad Caption routes imported successfully:', typeof adCaptionRoutes);
-  
-  // Register routes
-  app.use('/api/user', userRoutes);
-  app.use('/api/admin', adminRoutes);
-  app.use('/api/premium', premiumRoutes);
-  app.use('/api/razorpay', razorpayRoutes);
-  app.use('/api/ai', aiRoutes);
-  app.use('/api/ai/formula', aiFormulaRoutes);
-  app.use('/api/chat', chatRoutes);
-  app.use('/api/error-trend', errorTrendRoutes);
-  app.use('/api/aiworkmate/chat', aiworkmateChatRoutes);
-  app.use('/api/aiworkmate/prompt', aiworkmatePromptRoutes);
-  app.use('/api/pdf/brain', pdfBrainRoutes);
-  app.use('/api/pdf/chatagent', pdfChatAgentRoutes);
-  app.use('/api/pdf/chart', pdfChartRoutes);
-  app.use('/api/pdf/smartdata', smartDataExtractorRoutes);
-  app.use('/api/pdf/convert', pdfConverterProRoutes);
-  app.use('/api/bulkmailer/excel-engine', bulkmailerExcelEngineRoutes);
-  app.use ('/api/bulkmailer/mailmerge', mailmergeRoutes);
-  app.use('/api/bulkmailer/smart-templates', smartTemplatesRoutes);
-  app.use('/api/smartdocs/offer-letters', offerLetterRoutes);
-  app.use('/api/smartdocs/smart-invoices', smartInvoiceRoutes);
-  
-  app.use('/api/mailcraft/emailwizard', mailcraftRoutes);
-  console.log('Mailcraft routes mounted successfully!');
-  
-  app.use('/api/mailcraft/subjectlineoptimizer', subjectLineOptimizerRoutes);
-  console.log('Subject line optimizer routes mounted successfully!');
-  
-  app.use('/api/mailcraft/tonepolisher', tonePolisherRoutes);
-  console.log('Tone polisher routes mounted successfully!');
-  
-  // Mount socialpro routes
-  app.use('/api/socialpro/captionpro', captionProRoutes);
-  console.log('CaptionPro routes mounted successfully!');
-  
-  app.use('/api/socialpro/hashtagstrategist', hashtagStrategistRoutes);
-  console.log('Hashtag Strategist routes mounted successfully!');
-  app.use('/api/socialpro/adcaption', adCaptionRoutes);
-  console.log('Ad Caption routes mounted successfully!');
-  app.use('/api/socialpro/captionrewriter', captionRewriterRoutes);
-  console.log('Caption Rewriter routes mounted successfully!');
-  
-} catch (error) {
-  console.error('❌ ERROR IMPORTING ROUTES:', error);
-  if (error instanceof Error) {
-    console.error('Error details:', error.message);
-    console.error('Stack trace:', error.stack);
-  } else {
-    console.error('Error details:', error);
+// Route imports with per-route error handling so one optional module cannot
+// block the core auth routes from mounting.
+const safeLoadRoute = (routePath: string, label: string) => {
+  try {
+    const routeModule = require(routePath);
+    const route = routeModule.default;
+    console.log(`${label} routes imported successfully:`, typeof route);
+    return route;
+  } catch (error) {
+    console.error(`❌ ERROR IMPORTING ${label} ROUTES:`, error);
+    if (error instanceof Error) {
+      console.error('Error details:', error.message);
+      console.error('Stack trace:', error.stack);
+    } else {
+      console.error('Error details:', error);
+    }
+    return null;
   }
-}
+};
+
+const userRoutes = safeLoadRoute('./routes/user', 'User');
+if (userRoutes) app.use('/api/user', userRoutes);
+
+const adminRoutes = safeLoadRoute('./routes/admin', 'Admin');
+if (adminRoutes) app.use('/api/admin', adminRoutes);
+
+const premiumRoutes = safeLoadRoute('./routes/premium', 'Premium');
+if (premiumRoutes) app.use('/api/premium', premiumRoutes);
+
+const razorpayRoutes = safeLoadRoute('./routes/razorpay', 'Razorpay');
+if (razorpayRoutes) app.use('/api/razorpay', razorpayRoutes);
+
+const aiRoutes = safeLoadRoute('./routes/excel/ai', 'AI Excel');
+if (aiRoutes) app.use('/api/ai', aiRoutes);
+
+const aiFormulaRoutes = safeLoadRoute('./routes/excel/aiFormula', 'AI Formula');
+if (aiFormulaRoutes) app.use('/api/ai/formula', aiFormulaRoutes);
+
+const chatRoutes = safeLoadRoute('./routes/excel/chat', 'Chat');
+if (chatRoutes) app.use('/api/chat', chatRoutes);
+
+const errorTrendRoutes = safeLoadRoute('./routes/excel/errorTrend', 'Error Trend');
+if (errorTrendRoutes) app.use('/api/error-trend', errorTrendRoutes);
+
+const captionRewriterRoutes = safeLoadRoute('./routes/socialpro/captionRewriter', 'Caption Rewriter');
+if (captionRewriterRoutes) app.use('/api/socialpro/captionrewriter', captionRewriterRoutes);
+
+const aiworkmateChatRoutes = safeLoadRoute('./routes/aiworkmate/aiworkmatechat', 'AI Workmate Chat');
+if (aiworkmateChatRoutes) app.use('/api/aiworkmate/chat', aiworkmateChatRoutes);
+
+const aiworkmatePromptRoutes = safeLoadRoute('./routes/aiworkmate/prompt', 'AI Workmate Prompt');
+if (aiworkmatePromptRoutes) app.use('/api/aiworkmate/prompt', aiworkmatePromptRoutes);
+
+const pdfBrainRoutes = safeLoadRoute('./routes/pdf/pdfBrainRoutes', 'PDF Brain');
+if (pdfBrainRoutes) app.use('/api/pdf/brain', pdfBrainRoutes);
+
+const pdfChatAgentRoutes = safeLoadRoute('./routes/pdf/pdfChatAgentRoutes', 'PDF Chat Agent');
+if (pdfChatAgentRoutes) app.use('/api/pdf/chatagent', pdfChatAgentRoutes);
+
+const pdfChartRoutes = safeLoadRoute('./routes/pdf/pdfChartRoutes', 'PDF Chart');
+if (pdfChartRoutes) app.use('/api/pdf/chart', pdfChartRoutes);
+
+const smartDataExtractorRoutes = safeLoadRoute('./routes/pdf/smartDataExtractor', 'Smart Data Extractor');
+if (smartDataExtractorRoutes) app.use('/api/pdf/smartdata', smartDataExtractorRoutes);
+
+const offerLetterRoutes = safeLoadRoute('./routes/smartdocs/offerletter', 'Offer Letter');
+if (offerLetterRoutes) app.use('/api/smartdocs/offer-letters', offerLetterRoutes);
+
+const smartInvoiceRoutes = safeLoadRoute('./routes/smartdocs/smartinvoice', 'Smart Invoice');
+if (smartInvoiceRoutes) app.use('/api/smartdocs/smart-invoices', smartInvoiceRoutes);
+
+const pdfConverterProRoutes = safeLoadRoute('./routes/pdf/pdfConverterPro', 'PDF Converter Pro');
+if (pdfConverterProRoutes) app.use('/api/pdf/convert', pdfConverterProRoutes);
+
+const bulkmailerExcelEngineRoutes = safeLoadRoute('./routes/bulkmailer/excelEngine', 'Bulk Mailer Excel Engine');
+if (bulkmailerExcelEngineRoutes) app.use('/api/bulkmailer/excel-engine', bulkmailerExcelEngineRoutes);
+
+const mailmergeRoutes = safeLoadRoute('./routes/bulkmailer/mailmerge', 'Mail Merge');
+if (mailmergeRoutes) app.use('/api/bulkmailer/mailmerge', mailmergeRoutes);
+
+const smartTemplatesRoutes = safeLoadRoute('./routes/bulkmailer/smartTemplates', 'Smart Templates');
+if (smartTemplatesRoutes) app.use('/api/bulkmailer/smart-templates', smartTemplatesRoutes);
+
+const mailcraftRoutes = safeLoadRoute('./routes/mailcraft/emailwizard', 'Mailcraft Email Wizard');
+if (mailcraftRoutes) app.use('/api/mailcraft/emailwizard', mailcraftRoutes);
+
+const subjectLineOptimizerRoutes = safeLoadRoute('./routes/mailcraft/subjectlineoptimizer', 'Subject Line Optimizer');
+if (subjectLineOptimizerRoutes) app.use('/api/mailcraft/subjectlineoptimizer', subjectLineOptimizerRoutes);
+
+const tonePolisherRoutes = safeLoadRoute('./routes/mailcraft/tonepolisher', 'Tone Polisher');
+if (tonePolisherRoutes) app.use('/api/mailcraft/tonepolisher', tonePolisherRoutes);
+
+const captionProRoutes = safeLoadRoute('./routes/socialpro/captionPro', 'Caption Pro');
+if (captionProRoutes) app.use('/api/socialpro/captionpro', captionProRoutes);
+
+const hashtagStrategistRoutes = safeLoadRoute('./routes/socialpro/hashtagStrategist', 'Hashtag Strategist');
+if (hashtagStrategistRoutes) app.use('/api/socialpro/hashtagstrategist', hashtagStrategistRoutes);
+
+const adCaptionRoutes = safeLoadRoute('./routes/socialpro/adCaption', 'Ad Caption');
+if (adCaptionRoutes) app.use('/api/socialpro/adcaption', adCaptionRoutes);
 
 // Add a catch-all route for debugging 404s
 app.use('/api/mailcraft/emailwizard/*', (req: Request, res: Response) => {

@@ -37,10 +37,16 @@ const orderSchema = z.object({
   }),
 });
 
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
+const getRazorpayClient = () => {
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    throw new Error('RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be set');
+  }
+
+  return new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+  });
+};
 
 const paymentSchema = z.object({
   razorpay_order_id: z.string(),
@@ -79,6 +85,7 @@ router.post('/create-order', async (req, res) => {
       receipt: `receipt_order_${Date.now()}`,
     };
 
+    const razorpay = getRazorpayClient();
     const order = await razorpay.orders.create(options);
 
     // ARCHITECTURE IMPROVEMENT: Persist order with plan for later verification
@@ -127,6 +134,10 @@ router.post('/verify-payment', authenticate, async (req, res) => {
   const userJwt = req.user as import('jsonwebtoken').JwtPayload;
   const user_id = userJwt && typeof userJwt === 'object' && 'id' in userJwt ? (userJwt.id as number) : undefined;
   if (!user_id) return res.status(401).json({ error: 'Unauthorized' });
+
+  if (!process.env.RAZORPAY_KEY_SECRET) {
+    return res.status(500).json({ error: 'Razorpay is not configured' });
+  }
 
   // 1. Verify signature
   const generated_signature = crypto

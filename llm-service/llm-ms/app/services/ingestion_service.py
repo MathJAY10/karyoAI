@@ -47,6 +47,8 @@ class IngestionService:
 
             # 2. Chunk the document
             chunks = EmbeddingService.chunk_text(document_text)
+            if not chunks:
+                raise ValueError(f"No textual content extracted from document '{document_id}'")
             print(f"📦 Created {len(chunks)} chunks from document '{document_id}'")
 
             # 3. Generate embeddings for chunks (batch processing)

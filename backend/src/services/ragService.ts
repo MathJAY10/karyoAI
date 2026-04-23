@@ -19,6 +19,13 @@ interface IngestDocumentResponse {
   collectionId: string;
 }
 
+interface IngestDocumentApiResponse {
+  status: string;
+  document_id: string;
+  chunk_count: number;
+  collection_id: string;
+}
+
 interface RetrieveContextResponse {
   chunks: Array<{
     rankNumber: number;
@@ -31,6 +38,20 @@ interface RetrieveContextResponse {
     metadata: Record<string, any>;
   }>;
   sourceCount: number;
+}
+
+interface RetrieveContextApiResponse {
+  chunks: Array<{
+    rank: number;
+    chunk_id: string;
+    document_id: string;
+    chunk_number: number;
+    text: string;
+    distance: number;
+    similarity: number;
+    metadata: Record<string, any>;
+  }>;
+  source_count: number;
 }
 
 interface RAGQueryRequest {
@@ -56,6 +77,21 @@ interface RAGQueryResponse {
   model: string;
 }
 
+interface RAGQueryApiResponse {
+  answer: string;
+  context: Array<{
+    rank: number;
+    chunk_id: string;
+    document_id: string;
+    chunk_number: number;
+    text: string;
+    similarity: number;
+    metadata: Record<string, any>;
+  }>;
+  source_count: number;
+  model: string;
+}
+
 const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || process.env.LLM_SERVICE_URL || 'http://localhost:8001';
 
 class RAGService {
@@ -78,15 +114,22 @@ class RAGService {
     try {
       console.log(`📥 Ingesting document: ${request.documentId}`);
       
-      const response = await this.client.post<IngestDocumentResponse>('/ingest', {
+      const response = await this.client.post<IngestDocumentApiResponse>('/ingest', {
         document_id: request.documentId,
         document_text: request.documentText,
         metadata: request.metadata,
         collection_name: request.collectionName || 'documents',
       });
 
-      console.log(`✅ Document ingested: ${response.data.chunkCount} chunks`);
-      return response.data;
+      const mappedResponse: IngestDocumentResponse = {
+        status: response.data.status,
+        documentId: response.data.document_id,
+        chunkCount: response.data.chunk_count,
+        collectionId: response.data.collection_id,
+      };
+
+      console.log(`✅ Document ingested: ${mappedResponse.chunkCount} chunks`);
+      return mappedResponse;
     } catch (error: any) {
       console.error('❌ Document ingestion failed:', error.message);
       throw new Error(`Failed to ingest document: ${error.message}`);
@@ -109,14 +152,28 @@ class RAGService {
     try {
       console.log(`🔍 Retrieving context for: "${query}"`);
       
-      const response = await this.client.post<RetrieveContextResponse>('/retrieve', {
+      const response = await this.client.post<RetrieveContextApiResponse>('/retrieve', {
         query,
         collection_name: collectionName,
         n_results: nResults,
       });
 
-      console.log(`✅ Retrieved ${response.data.sourceCount} chunks`);
-      return response.data;
+      const mappedResponse: RetrieveContextResponse = {
+        chunks: response.data.chunks.map((chunk) => ({
+          rankNumber: chunk.rank,
+          chunkId: chunk.chunk_id,
+          documentId: chunk.document_id,
+          chunkNumber: chunk.chunk_number,
+          text: chunk.text,
+          distance: chunk.distance,
+          similarity: chunk.similarity,
+          metadata: chunk.metadata,
+        })),
+        sourceCount: response.data.source_count,
+      };
+
+      console.log(`✅ Retrieved ${mappedResponse.sourceCount} chunks`);
+      return mappedResponse;
     } catch (error: any) {
       console.error('❌ Context retrieval failed:', error.message);
       throw new Error(`Failed to retrieve context: ${error.message}`);
@@ -133,7 +190,7 @@ class RAGService {
     try {
       console.log(`🤖 RAG Query: "${request.query}"`);
       
-      const response = await this.client.post<RAGQueryResponse>('/query', {
+      const response = await this.client.post<RAGQueryApiResponse>('/query', {
         query: request.query,
         collection_name: request.collectionName || 'documents',
         n_context_chunks: request.nContextChunks || 5,
@@ -141,8 +198,23 @@ class RAGService {
         max_tokens: request.maxTokens || 512,
       });
 
-      console.log(`✅ Answer generated using ${response.data.sourceCount} sources`);
-      return response.data;
+      const mappedResponse: RAGQueryResponse = {
+        answer: response.data.answer,
+        context: response.data.context.map((chunk) => ({
+          rankNumber: chunk.rank,
+          chunkId: chunk.chunk_id,
+          documentId: chunk.document_id,
+          chunkNumber: chunk.chunk_number,
+          text: chunk.text,
+          similarity: chunk.similarity,
+          metadata: chunk.metadata,
+        })),
+        sourceCount: response.data.source_count,
+        model: response.data.model,
+      };
+
+      console.log(`✅ Answer generated using ${mappedResponse.sourceCount} sources`);
+      return mappedResponse;
     } catch (error: any) {
       console.error('❌ RAG query failed:', error.message);
       throw new Error(`RAG query failed: ${error.message}`);

@@ -1,13 +1,29 @@
 import { Request, Response } from 'express';
 import OpenAI from 'openai';
 import fs from 'fs';
+import { randomUUID } from 'crypto';
 import pdfParse from 'pdf-parse';
 import prisma from '../../lib/prisma';
 import ragService from '../../services/ragService';
-import { v4 as uuidv4 } from 'uuid';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const USE_RAG = process.env.USE_RAG === 'true';
+
+const generateOpenAIAnswer = async (prompt: string) => {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY is not configured');
+  }
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-3.5-turbo',
+    messages: [
+      { role: 'system', content: 'You are a helpful assistant for answering questions about PDF documents.' },
+      { role: 'user', content: prompt }
+    ]
+  });
+
+  return response.choices[0].message.content || '';
+};
 
 export const chatWithPDF = async (req: Request, res: Response) => {
   try {
@@ -73,7 +89,7 @@ export const chatWithPDF = async (req: Request, res: Response) => {
         // If using RAG, also ingest into vector database
         if (USE_RAG) {
           try {
-            const docId = `pdf_${chat.id}_${uuidv4()}`;
+            const docId = `pdf_${chat.id}_${randomUUID()}`;
             await ragService.ingestDocument({
               documentId: docId,
               documentText: fileText,
@@ -99,21 +115,16 @@ export const chatWithPDF = async (req: Request, res: Response) => {
       }
     }
     
-    // Store document IDs in database for reference
-    if (docIds.length > 0) {
-      await prisma.pdfChat.update({
-        where: { id: chat.id },
-        data: {
-          // Store as JSON in metadata or separate field if added to schema
-        }
-      });
-    }
-
     // Generate answer using RAG or standard context window approach
     let answer = '';
     
-    if (USE_RAG && docIds.length > 0) {
-      // Use RAG pipeline
+    if (USE_RAG) {
+      if (docIds.length === 0) {
+        return res.status(503).json({
+          error: 'RAG is enabled, but no PDF chunks were ingested successfully. Please check the RAG service.'
+        });
+      }
+
       try {
         console.log(`🤖 Using RAG for query: "${req.body.question}"`);
         const ragResult = await ragService.ragQuery({
@@ -125,29 +136,16 @@ export const chatWithPDF = async (req: Request, res: Response) => {
         });
         answer = ragResult.answer;
       } catch (ragError) {
-        console.error('⚠️  RAG query failed, falling back to context window:', ragError);
-        // Fall back to OpenAI with context window
-        const prompt = `You are a helpful assistant. Answer the following question based on the provided PDF content.\n\nPDF Content:\n${allText.slice(0, 8000)}\n\nQuestion: ${req.body.question}`;
-        const response = await openai.chat.completions.create({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            { role: 'system', content: 'You are a helpful assistant for answering questions about PDF documents.' },
-            { role: 'user', content: prompt }
-          ]
+        console.error('❌ RAG query failed:', ragError);
+        return res.status(503).json({
+          error: 'RAG query failed',
+          detail: process.env.NODE_ENV === 'development' && ragError instanceof Error ? ragError.message : undefined
         });
-        answer = response.choices[0].message.content || '';
       }
     } else {
-      // Standard context window approach
+      // Standard context window approach (OpenAI fallback mode)
       const prompt = `You are a helpful assistant. Answer the following question based on the provided PDF content.\n\nPDF Content:\n${allText.slice(0, 8000)}\n\nQuestion: ${req.body.question}`;
-      const response = await openai.chat.completions.create({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: 'You are a helpful assistant for answering questions about PDF documents.' },
-          { role: 'user', content: prompt }
-        ]
-      });
-      answer = response.choices[0].message.content || '';
+      answer = await generateOpenAIAnswer(prompt);
     }
     
     // Store bot message
@@ -187,6 +185,7 @@ export const chatWithPDF = async (req: Request, res: Response) => {
     
     res.json({ chat_id: chat.id, messages });
   } catch (err) {
+    console.error('❌ PDF chat request failed:', err);
     if (req.file && req.file.path) {
       try { fs.unlinkSync(req.file.path); } catch {}
     }
@@ -195,7 +194,10 @@ export const chatWithPDF = async (req: Request, res: Response) => {
         if (f && f.path) { try { fs.unlinkSync(f.path); } catch {} }
       }
     }
-    res.status(500).json({ error: 'Failed to process PDF chat request' });
+    res.status(500).json({
+      error: 'Failed to process PDF chat request',
+      detail: process.env.NODE_ENV === 'development' && err instanceof Error ? err.message : undefined
+    });
   }
 };
 

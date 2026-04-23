@@ -38,7 +38,6 @@ model User {
   captionRewriterChat        CaptionRewriterChat[]
   smartDataExtractorSessions SmartDataExtractorSession[]
   mailMergeAIChats           MailMergeAIChat[]
-  mailTemplates              MailTemplate[]
   documents                  Document[]
 
   @@map("users")

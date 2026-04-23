@@ -75,7 +75,7 @@ npm run dev
 
 # Terminal 2: LLM Service
 cd llm-service/llm-ms
-python -m uvicorn app.main:app --reload --port 8001
+python run.py
 
 # Terminal 3: Frontend
 cd frontend

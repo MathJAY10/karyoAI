@@ -4,6 +4,7 @@ Handles context retrieval from vectors and LLM-augmented answer generation
 """
 
 from typing import Dict, List, Optional
+import os
 from app.services.embedding_service import embedding_service
 from app.services.chroma_service import chroma_service
 from app.services.ollama_service import ollama_service
@@ -45,6 +46,7 @@ class QueryService:
             # 2. Query ChromaDB (semantic search)
             results = chroma_service.query(
                 collection_name=collection_name,
+                query_texts=[query],
                 query_embeddings=query_embedding,
                 n_results=n_results
             )
@@ -118,7 +120,8 @@ class QueryService:
                 return {
                     "answer": "No relevant documents found in the knowledge base.",
                     "context": [],
-                    "source_count": 0
+                    "source_count": 0,
+                    "model": os.getenv("MODEL_NAME", "llama3.2:latest")
                 }
 
             # 2. Build context from chunks

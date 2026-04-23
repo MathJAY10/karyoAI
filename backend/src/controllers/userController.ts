@@ -158,8 +158,11 @@ export const signup = async (req: Request, res: Response) => {
             accessToken
         });
     } catch (err) {
+        console.error('Signup error:', err);
         res.status(500).json({
-            error: 'Server error'
+          error: process.env.NODE_ENV === 'development' && err instanceof Error
+            ? err.message
+            : 'Server error'
         });
     }
 };

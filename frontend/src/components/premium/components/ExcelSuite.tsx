@@ -1,6 +1,6 @@
 import React from 'react';
 import ToolCard from './ToolCard';
-import { BarChart3, Calculator, Brain,  FileDown, TrendingUp } from 'lucide-react';
+import { BarChart3, Brain, FileDown } from 'lucide-react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 
 interface ExcelSuiteProps {

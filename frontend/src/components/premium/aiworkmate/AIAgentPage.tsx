@@ -277,9 +277,7 @@ const AIAgentPage: React.FC<AIAgentPageProps> = ({ isDarkMode: initialTheme = tr
     'SaoLa-Llama3.1-planner',
   ];
 
-  const [selectedModel, setSelectedModel] = useState<string>(LLM_MODELS[0]);
-  const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
-  const modelDropdownRef = useRef<HTMLDivElement>(null);
+  const [selectedModel] = useState<string>(LLM_MODELS[0]);
 
   // Helper to get model logo path
   const getModelLogo = (model: string) => {
