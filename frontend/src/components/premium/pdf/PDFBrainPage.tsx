@@ -47,6 +47,13 @@ interface AnalysisData {
   charts?: { type: string; title: string; data: { label: string; value: number }[] }[];
 }
 
+interface PdfBrainJobResponse {
+  job_id: string;
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  result: AnalysisData | null;
+  error: string | null;
+}
+
 const STEP_LABELS = [
   'Upload',
   'Analyze',
@@ -94,6 +101,7 @@ const PDFBrainPage: React.FC<PDFBrainPageProps> = ({ onBack }) => {
   const [chartLoading, setChartLoading] = useState(false);
   const [downloadLoading, setDownloadLoading] = useState<string | null>(null); // 'image' | 'pdf' | 'ppt' | null
   const [selectedChartType, setSelectedChartType] = useState<'bar' | 'pie' | 'line'>('bar');
+  const [analysisStatus, setAnalysisStatus] = useState<string>('');
 
   const { limitReached, checkLimit, Snackbar, handle429Error } = useUserLimit();
 
@@ -115,12 +123,45 @@ const PDFBrainPage: React.FC<PDFBrainPageProps> = ({ onBack }) => {
 
   // Remove getOpenAISummary and getWordFrequencies from frontend
 
+  const waitForAnalysisJob = async (jobId: string): Promise<AnalysisData> => {
+    const pollDelayMs = 2000;
+    const maxAttempts = 90;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const response = await api.get<PdfBrainJobResponse>(`pdf/brain/jobs/${jobId}`);
+      const job = response.data;
+
+      setAnalysisStatus(
+        job.status === 'queued'
+          ? 'Queued for analysis'
+          : job.status === 'processing'
+            ? 'Analyzing PDF in the background'
+            : job.status === 'completed'
+              ? 'Analysis complete'
+              : 'Analysis failed'
+      );
+
+      if (job.status === 'completed' && job.result) {
+        return job.result;
+      }
+
+      if (job.status === 'failed') {
+        throw new Error(job.error || 'Failed to analyze PDF');
+      }
+
+      await new Promise(resolve => setTimeout(resolve, pollDelayMs));
+    }
+
+    throw new Error('Timed out while waiting for PDF analysis');
+  };
+
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (await checkLimit(analysis ? 1 : 0) || limitReached) return;
     const file = acceptedFiles[0];
     if (file) {
       setUploadedFile({ name: file.name, size: file.size, type: file.type });
       setIsAnalyzing(true);
+      setAnalysisStatus('Submitting PDF for analysis');
       try {
         // Send file to backend for analysis
         const formData = new FormData();
@@ -137,7 +178,9 @@ const PDFBrainPage: React.FC<PDFBrainPageProps> = ({ onBack }) => {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
         const data = response.data;
-        const analysisData = data.analysis;
+        const analysisData: AnalysisData = response.status === 202 && data?.job_id
+          ? await waitForAnalysisJob(data.job_id)
+          : data.analysis;
         setAnalysis(analysisData);
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(analysisData));
         setCurrentStep(2);
@@ -150,6 +193,7 @@ const PDFBrainPage: React.FC<PDFBrainPageProps> = ({ onBack }) => {
         }
       } finally {
         setIsAnalyzing(false);
+        setAnalysisStatus('');
       }
     }
   }, [checkLimit, analysis, limitReached, handle429Error]);
@@ -459,6 +503,9 @@ const PDFBrainPage: React.FC<PDFBrainPageProps> = ({ onBack }) => {
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
             </svg>
             <span className="text-indigo-500 font-semibold">Analyzing your PDF…</span>
+            {analysisStatus && (
+              <span className="mt-2 text-sm text-blue-300">{analysisStatus}</span>
+            )}
           </div>
         )}
       </div>

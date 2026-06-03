@@ -205,7 +205,7 @@ Format your response as JSON with keys: "insight", "trends", "errors"`;
     try {
       const token = req.headers.authorization?.split(' ')[1];
       if (token) {
-        await fetch(`${process.env.BACKEND_URL || 'http://localhost:5000'}/api/user/update-limit`, {
+                await fetch(`${process.env.BACKEND_URL || 'http://localhost:5000'}/api/user/update-limit`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

@@ -93,6 +93,7 @@ interface RAGQueryApiResponse {
 }
 
 const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || process.env.LLM_SERVICE_URL || 'http://localhost:8001';
+const RAG_TIMEOUT = Number(process.env.RAG_TIMEOUT) || 240000;
 
 class RAGService {
   private client: AxiosInstance;
@@ -100,7 +101,7 @@ class RAGService {
   constructor() {
     this.client = axios.create({
       baseURL: `${RAG_SERVICE_URL}/api/rag`,
-      timeout: 60000, // 1 minute for document processing
+      timeout: RAG_TIMEOUT,
     });
   }
 
