@@ -142,6 +142,9 @@ if (hashtagStrategistRoutes) app.use('/api/socialpro/hashtagstrategist', hashtag
 const adCaptionRoutes = safeLoadRoute('./routes/socialpro/adCaption', 'Ad Caption');
 if (adCaptionRoutes) app.use('/api/socialpro/adcaption', adCaptionRoutes);
 
+const ragRoutes = safeLoadRoute('./routes/rag', 'RAG Async Pipeline');
+if (ragRoutes) app.use('/api/rag', ragRoutes);
+
 // Add a catch-all route for debugging 404s
 app.use('/api/mailcraft/emailwizard/*', (req: Request, res: Response) => {
   res.status(404).json({ 
