@@ -9,3 +9,10 @@
 .env
 backend/.env
 venv/
+
+# Scratch files
+scratch*
+
+# Uploads
+uploads/
+**/uploads/
