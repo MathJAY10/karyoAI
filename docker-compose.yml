@@ -53,7 +53,7 @@ services:
         wait $$pid
 
   chromadb:
-    image: chromadb/chroma:0.4.24
+    image: chromadb/chroma:1.5.8
     container_name: karyoai_chroma
     ports:
       - "8000:8000"

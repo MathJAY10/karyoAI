@@ -8,5 +8,8 @@
 .cursorignore
 .env
 backend/.env
+llm-service/llm-ms/.env
 venv/
 backend/uploads/
+scratch*
+

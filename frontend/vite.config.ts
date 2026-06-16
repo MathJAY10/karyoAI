@@ -11,7 +11,8 @@ export default defineConfig({
   },
   server: {
     host: "0.0.0.0",   // 👈 allow LAN access
-    port: 3000,
+    // port: 3000, // Removed to allow Vite to pick a safe default port (5173+)
+    strictPort: false, // Dynamically picks the next available port if taken
     open: true,
     proxy: {
       '/api': {

@@ -78,8 +78,6 @@ venv\Scripts\activate
 pip install -r requirements.txt
 
 
-
-
 # Start FastAPI server
 python run.py
 ```
