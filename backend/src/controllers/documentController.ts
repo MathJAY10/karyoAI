@@ -170,3 +170,39 @@ export const getDocumentStatus = async (
     });
   }
 };
+
+export const getReadyDocuments = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const documents = await prisma.document.findMany({
+      where: {
+        userId,
+        status: 'READY'
+      },
+      select: {
+        id: true,
+        fileName: true,
+        status: true,
+        createdAt: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.json(documents);
+  } catch (error) {
+    console.error('ERROR IN getReadyDocuments:', error);
+    res.status(500).json({
+      error: 'Internal server error'
+    });
+  }
+};

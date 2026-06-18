@@ -101,9 +101,10 @@ class ChromaDBService:
     def query(
         self,
         collection_name: str,
-        query_texts: List[str],
+        query_texts: List[str] = None,
         query_embeddings: Optional[List[List[float]]] = None,
-        n_results: int = 5
+        n_results: int = 5,
+        where: Optional[Dict] = None
     ) -> Dict:
         """
         Query a collection using text or embeddings
@@ -124,13 +125,15 @@ class ChromaDBService:
                 # Query using pre-computed embeddings
                 results = collection.query(
                     query_embeddings=query_embeddings,
-                    n_results=n_results
+                    n_results=n_results,
+                    where=where
                 )
             else:
                 # Query using text (ChromaDB will embed internally)
                 results = collection.query(
                     query_texts=query_texts,
-                    n_results=n_results
+                    n_results=n_results,
+                    where=where
                 )
             
             return results

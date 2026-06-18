@@ -53,7 +53,7 @@ services:
         wait $$pid
 
   chromadb:
-    image: chromadb/chroma:1.5.8
+    image: chromadb/chroma:0.4.24
     container_name: karyoai_chroma
     ports:
       - "8000:8000"
@@ -74,6 +74,8 @@ services:
       - DATABASE_URL=postgresql://karyoai:karyoai_secure_password@postgres:5432/karyoai
       - REDIS_URL=redis://redis:6379
       - INTERNAL_SERVICE_TOKEN=karyoai_internal_secure_token
+      - RAG_SERVICE_URL=http://host.docker.internal:8005
+      - LLM_SERVICE_URL=http://host.docker.internal:8005
     volumes:
       - ./backend/uploads:/app/uploads
     depends_on:

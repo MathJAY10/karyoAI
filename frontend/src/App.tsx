@@ -45,6 +45,7 @@ import ExportWizard from "./components/premium/excel/ExportWizard";
 import Settings from "./components/premium/Settings";
 import PDFBrainPageWrapper from "./components/premium/pdf/PDFBrainPageWrapper";
 import PDFChatAgentPage from "./components/premium/pdf/PDFChatAgentPage";
+import PDFDocumentPicker from "./components/premium/pdf/PDFDocumentPicker";
 import SmartInvoiceGeneratorPage from "./components/premium/smartdocs/SmartInvoiceGeneratorPage";
 import CaptionRewriterPage from "./components/premium/socialpro/CaptionRewriterPage";
 import SmartDataExtractorPage from "./components/premium/pdf/SmartDataExtractorPage";
@@ -150,7 +151,8 @@ function App() {
               </Route>
               <Route path="pdfhub" element={<PDFHubPage />} />
               <Route path="pdfhub/brain" element={<PDFBrainPageWrapper />} />
-              <Route path="pdfhub/chatagent" element={<PDFChatAgentPage />} />
+              <Route path="pdfhub/chatagent" element={<PDFDocumentPicker />} />
+              <Route path="pdfhub/chatagent/:documentId" element={<PDFChatAgentPage />} />
               <Route path="pdfhub/smartdata" element={<SmartDataExtractorPage />} />  
               <Route path="pdfhub/converterpro" element={<PDFConverterPro />} />
               <Route path="aiworkmate" element={<AIWorkmatePage />} />

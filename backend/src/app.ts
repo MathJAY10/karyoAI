@@ -15,17 +15,22 @@ const allowedOrigins = [
   'https://www.karyoai.com',
   'https://hoppscotch.io',
   'http://localhost:3000',
+  'http://127.0.0.1:3000',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
+  'http://localhost:5174',
+  'http://127.0.0.1:5174',
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
+    console.log("Incoming Origin:", origin);
     // allow requests with no origin (like curl or Postman)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     } else {
+      console.error(`❌ CORS rejected origin: ${origin}`);
       return callback(new Error('Not allowed by CORS'));
     }
   },

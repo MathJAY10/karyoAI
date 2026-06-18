@@ -60,6 +60,7 @@ interface RAGQueryRequest {
   nContextChunks?: number;
   temperature?: number;
   maxTokens?: number;
+  metadataFilter?: Record<string, any>;
 }
 
 interface RAGQueryResponse {
@@ -95,6 +96,12 @@ interface RAGQueryApiResponse {
 const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || process.env.LLM_SERVICE_URL || 'http://localhost:8001';
 const RAG_TIMEOUT = Number(process.env.RAG_TIMEOUT) || 240000;
 
+console.log('================================');
+console.log('RAG_SERVICE_URL =', process.env.RAG_SERVICE_URL);
+console.log('LLM_SERVICE_URL =', process.env.LLM_SERVICE_URL);
+console.log('FINAL_RAG_URL =', RAG_SERVICE_URL);
+console.log('================================');
+
 class RAGService {
   private client: AxiosInstance;
 
@@ -103,6 +110,20 @@ class RAGService {
       baseURL: `${RAG_SERVICE_URL}/api/rag`,
       timeout: RAG_TIMEOUT,
     });
+
+    (async () => {
+      try {
+        const response = await axios.get(
+          `${RAG_SERVICE_URL}/api/rag/rag/health`,
+          { timeout: 5000 }
+        );
+        console.log('✅ RAG HEALTH CHECK PASSED');
+        console.log(response.data);
+      } catch (err: any) {
+        console.error('❌ RAG HEALTH CHECK FAILED');
+        console.error(err.message);
+      }
+    })();
   }
 
   /**
@@ -191,13 +212,16 @@ class RAGService {
     try {
       console.log(`🤖 RAG Query: "${request.query}"`);
       
-      const response = await this.client.post<RAGQueryApiResponse>('/query', {
+      const payload = {
         query: request.query,
         collection_name: request.collectionName || 'documents',
         n_context_chunks: request.nContextChunks || 5,
         temperature: request.temperature || 0.7,
         max_tokens: request.maxTokens || 512,
-      });
+        metadata_filter: request.metadataFilter
+      };
+
+      const response = await this.client.post<RAGQueryApiResponse>('/query', payload);
 
       const mappedResponse: RAGQueryResponse = {
         answer: response.data.answer,

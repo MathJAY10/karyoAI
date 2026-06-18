@@ -1,199 +1,167 @@
 import { Request, Response } from 'express';
-import OpenAI from 'openai';
-import fs from 'fs';
-import { randomUUID } from 'crypto';
-import pdfParse from 'pdf-parse';
 import prisma from '../../lib/prisma';
 import ragService from '../../services/ragService';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const USE_RAG = process.env.USE_RAG === 'true';
-
-const generateOpenAIAnswer = async (prompt: string) => {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY is not configured');
-  }
-
-  const response = await openai.chat.completions.create({
-    model: 'gpt-3.5-turbo',
-    messages: [
-      { role: 'system', content: 'You are a helpful assistant for answering questions about PDF documents.' },
-      { role: 'user', content: prompt }
-    ]
-  });
-
-  return response.choices[0].message.content || '';
-};
-
 export const chatWithPDF = async (req: Request, res: Response) => {
   try {
-    // IMPORTANT: The userId must exist in the users table due to foreign key constraint.
-    // For production, always use the authenticated user's ID. For local testing, ensure a user with id=1 exists.
-    // If not authenticated, return an error instead of defaulting to 1.
     const userId = (req as any).user?.id;
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated. Please log in.' });
     }
     
-    const files = (req.files as Express.Multer.File[]) || [];
-    if (!files.length) {
-      return res.status(400).json({ error: 'No PDF files uploaded' });
+    const { documentId, question, sessionId } = req.body;
+    
+    if (!documentId) {
+      return res.status(400).json({ error: 'No documentId provided' });
     }
     
-    if (!req.body.question || typeof req.body.question !== 'string') {
-      files.forEach(f => fs.unlinkSync(f.path));
+    if (!question || typeof question !== 'string') {
       return res.status(400).json({ error: 'No question provided' });
     }
     
-    for (const file of files) {
-      if (file.size > 10 * 1024 * 1024) {
-        fs.unlinkSync(file.path);
-        return res.status(400).json({ error: `PDF file size exceeds 10MB limit: ${file.originalname}` });
-      }
+    // 1. Verify Document
+    const document = await prisma.document.findUnique({
+      where: { id: Number(documentId) }
+    });
+    
+    if (!document) {
+      return res.status(404).json({ error: 'Document not found' });
     }
     
-    // Create new chat session
-    const fileNames = files.map(f => f.originalname).join(', ');
-    const totalSize = files.reduce((sum, f) => sum + f.size, 0);
-    const fileTypes = files.map(f => f.mimetype).join(', ');
+    if (document.userId !== userId) {
+      return res.status(403).json({ error: 'Access denied to this document' });
+    }
+
+    if (!document.workspaceId) {
+      return res.status(400).json({ error: 'Document must belong to a workspace to start a chat session' });
+    }
     
-    const chat = await prisma.pdfChat.create({
-      data: {
-        userId: userId,
-        fileName: fileNames,
-        fileSize: totalSize,
-        fileType: fileTypes
+    if (document.status !== 'READY') {
+      return res.status(400).json({ error: `Document is not ready for querying. Current status: ${document.status}` });
+    }
+    
+    // 2. Handle Chat Session
+    let currentSessionId = sessionId ? Number(sessionId) : null;
+    let messages: any[] = [];
+    
+    if (currentSessionId) {
+      // Validate existing session
+      const session = await prisma.chatSession.findUnique({
+        where: { id: currentSessionId },
+        include: { workspace: true, messages: { orderBy: { createdAt: 'asc' } } }
+      });
+      
+      if (!session) {
+        return res.status(404).json({ error: 'Chat session not found' });
       }
-    });
-    
-    // Store user message
-    await prisma.pdfChatMessage.create({
-      data: {
-        chatId: chat.id,
-        sender: 'user',
-        content: req.body.question
+      
+      if (session.workspace.userId !== userId) {
+        return res.status(403).json({ error: 'Access denied to this chat session' });
       }
-    });
-    
-    // Parse PDFs and concatenate text
-    let allText = '';
-    const docIds: string[] = [];
-    
-    for (const file of files) {
-      try {
-        const dataBuffer = fs.readFileSync(file.path);
-        const pdfData = await pdfParse(dataBuffer);
-        const fileText = pdfData.text;
-        allText += `\n--- File: ${file.originalname} ---\n` + fileText;
-        
-        // If using RAG, also ingest into vector database
-        if (USE_RAG) {
-          try {
-            const docId = `pdf_${chat.id}_${randomUUID()}`;
-            await ragService.ingestDocument({
-              documentId: docId,
-              documentText: fileText,
-              metadata: {
-                originalFileName: file.originalname,
-                fileSize: file.size,
-                chatId: chat.id,
-                userId: userId,
-                uploadedAt: new Date().toISOString()
-              },
-              collectionName: `user_${userId}_documents`
-            });
-            docIds.push(docId);
-            console.log(`✅ Ingested PDF to RAG: ${file.originalname}`);
-          } catch (ragError) {
-            console.error(`⚠️  Failed to ingest PDF to RAG: ${file.originalname}`, ragError);
-            // Don't fail the request if RAG ingestion fails - fall back to context window
+      
+      messages = session.messages;
+    } else {
+      // Create new session
+      const newSession = await prisma.chatSession.create({
+        data: {
+          workspaceId: document.workspaceId,
+          title: `Chat about ${document.fileName || 'Document'}`,
+          documents: {
+            create: {
+              documentId: document.id
+            }
           }
         }
-      } catch (parseErr) {
-        fs.unlinkSync(file.path);
-        return res.status(400).json({ error: `Failed to parse PDF: ${file.originalname}. The file may be corrupted or in an unsupported format.` });
-      }
+      });
+      currentSessionId = newSession.id;
     }
     
-    // Generate answer using RAG or standard context window approach
-    let answer = '';
-    
-    if (USE_RAG) {
-      if (docIds.length === 0) {
-        return res.status(503).json({
-          error: 'RAG is enabled, but no PDF chunks were ingested successfully. Please check the RAG service.'
-        });
-      }
-
-      try {
-        console.log(`🤖 Using RAG for query: "${req.body.question}"`);
-        const ragResult = await ragService.ragQuery({
-          query: req.body.question,
-          collectionName: `user_${userId}_documents`,
-          nContextChunks: 5,
-          temperature: 0.7,
-          maxTokens: 512
-        });
-        answer = ragResult.answer;
-      } catch (ragError) {
-        console.error('❌ RAG query failed:', ragError);
-        return res.status(503).json({
-          error: 'RAG query failed',
-          detail: process.env.NODE_ENV === 'development' && ragError instanceof Error ? ragError.message : undefined
-        });
-      }
-    } else {
-      // Standard context window approach (OpenAI fallback mode)
-      const prompt = `You are a helpful assistant. Answer the following question based on the provided PDF content.\n\nPDF Content:\n${allText.slice(0, 8000)}\n\nQuestion: ${req.body.question}`;
-      answer = await generateOpenAIAnswer(prompt);
-    }
-    
-    // Store bot message
-    await prisma.pdfChatMessage.create({
+    // Save User Message
+    await prisma.message.create({
       data: {
-        chatId: chat.id,
-        sender: 'bot',
-        content: answer
+        sessionId: currentSessionId,
+        sender: 'user',
+        content: question
       }
     });
-
-    // Update user limit after successful OpenAI response
-    try {
-      const token = req.headers.authorization?.split(' ')[1];
-      if (token) {
-        await fetch(`${process.env.BACKEND_URL || 'http://localhost:5000'}/api/user/update-limit`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ limitType: 'message' })
-        });
-      }
-    } catch (limitError) {
-      console.error('Failed to update user limit:', limitError);
-      // Don't fail the request if limit update fails
+    
+    // 3. Prepare Context from History
+    // Format previous messages to pass into the prompt
+    let conversationHistory = "";
+    if (messages.length > 0) {
+      conversationHistory = "Previous Conversation:\n" + messages.map(m => `${m.sender === 'user' ? 'Human' : 'Assistant'}: ${m.content}`).join('\n') + "\n\n";
     }
     
-    files.forEach(f => fs.unlinkSync(f.path));
+    const finalQuery = conversationHistory 
+      ? `${conversationHistory}Current Question: ${question}\n\nPlease answer the current question based on the provided context, keeping in mind the previous conversation if relevant.`
+      : question;
     
-    // Return chat id and all messages
-    const messages = await prisma.pdfChatMessage.findMany({
-      where: { chatId: chat.id },
-      orderBy: { createdAt: 'asc' }
-    });
+    // 4. Query RAG Service with strict filtering
+    try {
+      const collectionName = 'documents';
+      const metadataFilter = { documentId: String(documentId) };
+
+      console.log(`🤖 RAG Query for Document ${documentId}`);
+      console.log("Collection:", collectionName);
+      console.log("Document:", documentId);
+      console.log("Filter:", metadataFilter);
+      
+      const ragResult = await ragService.ragQuery({
+        query: finalQuery,
+        collectionName,
+        nContextChunks: 5,
+        temperature: 0.7,
+        maxTokens: 512,
+        metadataFilter
+      });
+      
+      if (!ragResult.context || ragResult.context.length === 0) {
+        // Warning: The query succeeded but 0 chunks matched.
+        console.warn(`⚠️ RAG retrieved 0 chunks for documentId ${documentId}. Ensure the document was properly ingested.`);
+      }
+      
+      // Save Assistant Message
+      await prisma.message.create({
+        data: {
+          sessionId: currentSessionId,
+          sender: 'bot',
+          content: ragResult.answer
+        }
+      });
+      
+      // Update user limit
+      try {
+        const token = req.headers.authorization?.split(' ')[1];
+        if (token) {
+          await fetch(`${process.env.BACKEND_URL || 'http://localhost:5000'}/api/user/update-limit`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ limitType: 'message' })
+          });
+        }
+      } catch (limitError) {
+        console.error('Failed to update user limit:', limitError);
+      }
+      
+      return res.json({ 
+        sessionId: currentSessionId, 
+        answer: ragResult.answer,
+        sources: ragResult.context
+      });
+      
+    } catch (ragError) {
+      console.error('❌ RAG query failed:', ragError);
+      return res.status(503).json({
+        error: 'RAG query failed',
+        detail: process.env.NODE_ENV === 'development' && ragError instanceof Error ? ragError.message : undefined
+      });
+    }
     
-    res.json({ chat_id: chat.id, messages });
   } catch (err) {
     console.error('❌ PDF chat request failed:', err);
-    if (req.file && req.file.path) {
-      try { fs.unlinkSync(req.file.path); } catch {}
-    }
-    if (req.files && Array.isArray(req.files)) {
-      for (const f of req.files) {
-        if (f && f.path) { try { fs.unlinkSync(f.path); } catch {} }
-      }
-    }
     res.status(500).json({
       error: 'Failed to process PDF chat request',
       detail: process.env.NODE_ENV === 'development' && err instanceof Error ? err.message : undefined
@@ -203,19 +171,31 @@ export const chatWithPDF = async (req: Request, res: Response) => {
 
 export const getPDFChatById = async (req: Request, res: Response) => {
   try {
-    const { chat_id } = req.params;
-    // Optionally, check user ownership here
-    const messages = await prisma.pdfChatMessage.findMany({
-      where: { chatId: Number(chat_id) },
-      orderBy: { createdAt: 'asc' }
-    });
+    const { sessionId } = req.params;
+    const userId = (req as any).user?.id;
     
-    if (!messages || messages.length === 0) {
-      return res.status(404).json({ error: 'Chat not found' });
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
     }
     
-    res.json({ chat_id, messages });
+    const session = await prisma.chatSession.findUnique({
+      where: { id: Number(sessionId) },
+      include: {
+        workspace: true,
+        messages: { orderBy: { createdAt: 'asc' } }
+      }
+    });
+    
+    if (!session) {
+      return res.status(404).json({ error: 'Chat session not found' });
+    }
+    
+    if (session.workspace.userId !== userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    res.json({ sessionId: session.id, messages: session.messages });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch chat' });
   }
-}; 
+};

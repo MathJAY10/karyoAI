@@ -52,7 +52,8 @@ class RAGService:
         query: str,
         collection_name: str = "documents",
         n_results: int = 5,
-        query_embedding: Optional[List[float]] = None
+        query_embedding: Optional[List[float]] = None,
+        metadata_filter: Optional[Dict] = None
     ) -> List[Dict]:
         """
         Retrieve relevant context via QueryService
@@ -70,7 +71,8 @@ class RAGService:
             query=query,
             collection_name=collection_name,
             n_results=n_results,
-            query_embedding=query_embedding
+            query_embedding=query_embedding,
+            metadata_filter=metadata_filter
         )
 
     @staticmethod
@@ -79,7 +81,8 @@ class RAGService:
         collection_name: str = "documents",
         n_context_chunks: int = 5,
         temperature: float = 0.7,
-        max_tokens: int = 512
+        max_tokens: int = 512,
+        metadata_filter: Optional[Dict] = None
     ) -> Dict:
         """
         Execute full RAG pipeline via QueryService
@@ -99,7 +102,8 @@ class RAGService:
             collection_name=collection_name,
             n_context_chunks=n_context_chunks,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
+            metadata_filter=metadata_filter
         )
 
     @staticmethod

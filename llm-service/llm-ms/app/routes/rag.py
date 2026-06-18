@@ -37,6 +37,7 @@ class RetrieveContextRequest(BaseModel):
     query: str
     collection_name: str = "documents"
     n_results: int = 5
+    metadata_filter: Optional[dict] = None
 
 
 class RetrieveContextResponse(BaseModel):
@@ -52,6 +53,7 @@ class RAGQueryRequest(BaseModel):
     n_context_chunks: int = 5
     temperature: float = 0.7
     max_tokens: int = 512
+    metadata_filter: Optional[dict] = None
 
 
 class RAGQueryResponse(BaseModel):
@@ -94,26 +96,18 @@ async def ingest_document(request: IngestDocumentRequest):
         )
 
 
-@router.post("/retrieve")
-async def retrieve_context(request: RetrieveContextRequest) -> RetrieveContextResponse:
+@router.post("/retrieve", response_model=RetrieveContextResponse)
+async def retrieve_context(request: RetrieveContextRequest):
     """
-    Retrieve relevant document chunks for a query
-    
-    Finds the most relevant chunks from the knowledge base based on semantic similarity
-    
-    Args:
-        query: Question or search query
-        collection_name: Name of the collection to search
-        n_results: Number of chunks to retrieve
-        
-    Returns:
-        List of relevant chunks with similarity scores
+    Retrieve relevant context chunks for a query
+    Does not generate an answer
     """
     try:
         chunks = await rag_service.retrieve_context(
             query=request.query,
             collection_name=request.collection_name,
-            n_results=request.n_results
+            n_results=request.n_results,
+            metadata_filter=request.metadata_filter
         )
         return RetrieveContextResponse(chunks=chunks, source_count=len(chunks))
     except Exception as e:
@@ -123,22 +117,10 @@ async def retrieve_context(request: RetrieveContextRequest) -> RetrieveContextRe
         )
 
 
-@router.post("/query")
-async def rag_query(request: RAGQueryRequest) -> RAGQueryResponse:
+@router.post("/query", response_model=RAGQueryResponse)
+async def rag_query(request: RAGQueryRequest):
     """
-    Perform full RAG pipeline: retrieve context and generate answer
-    
-    Retrieves relevant documents and uses them to generate a contextual answer
-    
-    Args:
-        query: User question
-        collection_name: Name of the collection
-        n_context_chunks: Number of chunks to use for context
-        temperature: LLM creativity (0-2)
-        max_tokens: Max response length
-        
-    Returns:
-        Generated answer with source chunks
+    Full RAG pipeline: retrieve context and generate answer
     """
     try:
         result = await rag_service.rag_query(
@@ -146,7 +128,8 @@ async def rag_query(request: RAGQueryRequest) -> RAGQueryResponse:
             collection_name=request.collection_name,
             n_context_chunks=request.n_context_chunks,
             temperature=request.temperature,
-            max_tokens=request.max_tokens
+            max_tokens=request.max_tokens,
+            metadata_filter=request.metadata_filter
         )
         return RAGQueryResponse(**result)
     except Exception as e:

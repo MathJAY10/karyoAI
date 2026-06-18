@@ -1,11 +1,9 @@
 import { Request, Response } from 'express';
-import OpenAI from 'openai';
 import fs from 'fs';
 import pdfParse from 'pdf-parse';
 import { randomUUID } from 'crypto';
 import ragService from '../../services/ragService';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 type PdfBrainJobStatus = 'queued' | 'processing' | 'completed' | 'failed';
 
@@ -55,7 +53,6 @@ type StructuredAnalysisPayload = {
   topics?: string[];
 };
 
-const hasOpenAIKey = Boolean(process.env.OPENAI_API_KEY);
 
 const extractJsonPayload = (value: string): string => {
   const trimmed = value.trim();
@@ -123,21 +120,7 @@ const generateTextWithFallback = async (
   try {
     return await generateTextWithRag(collectionName, prompt);
   } catch (ragError) {
-    console.warn('⚠️  RAG analysis failed, falling back to OpenAI:', ragError);
-
-    if (!hasOpenAIKey) {
-      throw ragError;
-    }
-
-    const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt },
-      ],
-    });
-
-    return response.choices[0].message.content || '';
+    throw ragError;
   }
 };
 

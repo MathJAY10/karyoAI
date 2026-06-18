@@ -18,7 +18,8 @@ class QueryService:
         query: str,
         collection_name: str = "documents",
         n_results: int = 5,
-        query_embedding: Optional[List[float]] = None
+        query_embedding: Optional[List[float]] = None,
+        metadata_filter: Optional[Dict] = None
     ) -> List[Dict]:
         """
         Retrieve relevant document chunks based on semantic similarity
@@ -39,17 +40,24 @@ class QueryService:
             4. Return top-k chunks with metadata and relevance scores
         """
         try:
-            # 1. Generate query embedding if not provided
-            if not query_embedding:
-                query_embedding = [await embedding_service.generate_embedding(query)]
+            # 1. Skip Ollama embedding if none provided to allow ChromaDB default embedding (MiniLM) to run
+            # This matches the ingestion worker which uses Chroma default MiniLM.
 
             # 2. Query ChromaDB (semantic search)
-            results = chroma_service.query(
-                collection_name=collection_name,
-                query_texts=[query],
-                query_embeddings=query_embedding,
-                n_results=n_results
-            )
+            if query_embedding:
+                results = chroma_service.query(
+                    collection_name=collection_name,
+                    query_embeddings=query_embedding,
+                    n_results=n_results,
+                    where=metadata_filter
+                )
+            else:
+                results = chroma_service.query(
+                    collection_name=collection_name,
+                    query_texts=[query],
+                    n_results=n_results,
+                    where=metadata_filter
+                )
 
             # 3. Format results
             formatted_results = []
@@ -86,7 +94,8 @@ class QueryService:
         collection_name: str = "documents",
         n_context_chunks: int = 5,
         temperature: float = 0.7,
-        max_tokens: int = 512
+        max_tokens: int = 512,
+        metadata_filter: Optional[Dict] = None
     ) -> Dict:
         """
         Execute full RAG pipeline: retrieve context and generate LLM answer
@@ -113,7 +122,8 @@ class QueryService:
             context_chunks = await QueryService.retrieve_context(
                 query=query,
                 collection_name=collection_name,
-                n_results=n_context_chunks
+                n_results=n_context_chunks,
+                metadata_filter=metadata_filter
             )
 
             if not context_chunks:
