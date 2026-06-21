@@ -3,6 +3,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 // Removed dynamic sitemap/robots serving; now served statically from frontend
+import './workers/memoryWorker'; // Start the MemoryWorker
 
 dotenv.config();
 

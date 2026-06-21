@@ -40,6 +40,7 @@ model User {
   mailMergeAIChats           MailMergeAIChat[]
   documents                  Document[]
   workspaces                 Workspace[]
+  memoryFacts                MemoryFact[]
 
   @@map("users")
 }
@@ -582,4 +583,25 @@ model Message {
 
   @@index([sessionId])
   @@map("messages")
+}
+
+model MemoryFact {
+  id                  Int      @id @default(autoincrement())
+  userId              Int      @map("user_id")
+  content             String   @db.Text
+  sourceChatSessionId Int?     @map("source_chat_session_id")
+  embeddingStatus     EmbeddingStatus @default(PENDING) @map("embedding_status")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("memory_facts")
+}
+
+enum EmbeddingStatus {
+  PENDING
+  INDEXED
+  FAILED
 }

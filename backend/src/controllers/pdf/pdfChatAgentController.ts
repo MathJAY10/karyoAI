@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../../lib/prisma';
 import ragService from '../../services/ragService';
+import { memoryQueue } from '../../config/bullmq';
 
 export const chatWithPDF = async (req: Request, res: Response) => {
   try {
@@ -128,6 +129,25 @@ export const chatWithPDF = async (req: Request, res: Response) => {
           content: ragResult.answer
         }
       });
+      
+      // 5. Debounce Memory Extraction Job
+      try {
+        const jobId = `extract_session_${currentSessionId}`;
+        const existingJob = await memoryQueue.getJob(jobId);
+        if (existingJob) {
+          await memoryQueue.remove(jobId);
+          console.log(`[MEMORY_QUEUE] Job Cancelled: ${jobId}`);
+        }
+        
+        await memoryQueue.add(
+          'extract',
+          { sessionId: currentSessionId, userId, type: 'pdf_chat' },
+          { jobId, delay: 3 * 60 * 1000 } // 3 minutes
+        );
+        console.log(`[MEMORY_QUEUE] Job Scheduled: ${jobId} (Delay: 180s)`);
+      } catch (queueError) {
+        console.error('[CRITICAL] Failed to queue memory extraction:', queueError);
+      }
       
       // Update user limit
       try {

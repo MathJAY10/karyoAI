@@ -14,7 +14,7 @@ import time
 load_dotenv()
 
 # Import routes
-from app.routes import chat, rag
+from app.routes import chat, rag, internal_memory
 
 # Create FastAPI application
 app = FastAPI(
@@ -56,6 +56,7 @@ async def log_requests(request: Request, call_next):
 # Include routers (API endpoints)
 app.include_router(chat.router, prefix="/api/llm", tags=["LLM"])
 app.include_router(rag.router, prefix="/api/rag", tags=["RAG"])
+app.include_router(internal_memory.router, prefix="/internal/memory", tags=["Internal Memory"])
 
 # Root endpoint
 @app.get("/")

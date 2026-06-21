@@ -3,6 +3,7 @@ import prisma from '../../lib/prisma';
 import path from 'path';
 import fs from 'fs';
 import { llmService } from '../../services/llmService';
+import { memoryQueue } from '../../config/bullmq';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB, similar to ChatGPT free tier
 
@@ -79,6 +80,25 @@ export const sendMessage = async (req: Request, res: Response) => {
         content: aiMessage,
       }
     });
+
+    // Debounce Memory Extraction Job
+    try {
+      const jobId = `extract_session_aiworkmate_${chatSessionId}`;
+      const existingJob = await memoryQueue.getJob(jobId);
+      if (existingJob) {
+        await memoryQueue.remove(jobId);
+        console.log(`[MEMORY_QUEUE] Job Cancelled: ${jobId}`);
+      }
+      
+      await memoryQueue.add(
+        'extract',
+        { sessionId: chatSessionId, userId, type: 'ai_workmate' },
+        { jobId, delay: 3 * 60 * 1000 } // 3 minutes
+      );
+      console.log(`[MEMORY_QUEUE] Job Scheduled: ${jobId} (Delay: 180s)`);
+    } catch (queueError) {
+      console.error('[CRITICAL] Failed to queue memory extraction:', queueError);
+    }
 
     // Update user limit after successful OpenAI response
     try {
