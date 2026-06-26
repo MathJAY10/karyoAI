@@ -39,61 +39,9 @@ export const requireRole = (role: string) => (req: Request, res: Response, next:
 };
 
 export const checkMessageLimit = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-        const userJwt = req.user as JwtPayload;
-        if (!userJwt || typeof userJwt !== 'object' || !userJwt.id) {
-            return res.status(401).json({ error: 'Invalid token' });
-        }
-
-        const user = await prisma.user.findUnique({
-            where: { id: userJwt.id },
-            select: { messageLimit: true, plan: true }
-        });
-
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        if (user.messageLimit <= 0) {
-            return res.status(429).json({ 
-                error: 'Message limit exceeded',
-                message: 'You have reached your message limit. Please upgrade to continue using the service.'
-            });
-        }
-
-        next();
-    } catch (error) {
-        console.error('Message limit check error:', error);
-        res.status(500).json({ error: 'Failed to check message limit' });
-    }
+    next();
 };
 
 export const checkEmailLimit = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-        const userJwt = req.user as JwtPayload;
-        if (!userJwt || typeof userJwt !== 'object' || !userJwt.id) {
-            return res.status(401).json({ error: 'Invalid token' });
-        }
-
-        const user = await prisma.user.findUnique({
-            where: { id: userJwt.id },
-            select: { emailLimit: true, plan: true }
-        });
-
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        if (user.emailLimit <= 0) {
-            return res.status(429).json({ 
-                error: 'Email limit exceeded',
-                message: 'You have reached your email limit. Please upgrade to continue using the service.'
-            });
-        }
-
-        next();
-    } catch (error) {
-        console.error('Email limit check error:', error);
-        res.status(500).json({ error: 'Failed to check email limit' });
-    }
+    next();
 };

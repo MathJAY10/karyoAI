@@ -13,3 +13,23 @@ venv/
 backend/uploads/
 scratch*
 
+# Dev-only test, audit & debug scripts (not for production)
+tests/
+test_*.py
+test_*.js
+test_*.ts
+audit_*.py
+audit_*.js
+audit_*.ts
+forensic_*.py
+run_audit*.py
+run_full*.py
+run_reaudit*.py
+check_db.js
+check_tools.py
+dump_context.js
+context_dump.txt
+trigger_e2e*.js
+migrate_chroma.py
+setup_mock_memory.py
+

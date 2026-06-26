@@ -134,7 +134,7 @@ class EmbeddingService:
                         return any(EMBEDDING_MODEL in name for name in model_names)
                     return False
         except Exception as e:
-            print(f"❌ Failed to check embedding model: {e}")
+            print(f"[ERROR] Failed to check embedding model: {e}")
             return False
 
 

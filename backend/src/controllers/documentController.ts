@@ -47,15 +47,54 @@ export const uploadDocument = async (
     if (existingDoc) {
       console.log('DOCUMENT ALREADY EXISTS:', existingDoc.id);
 
+      if (existingDoc.status === 'READY') {
+        res.status(200).json({
+          message: 'Document already exists and is ready',
+          documentId: existingDoc.id,
+          status: existingDoc.status
+        });
+        return;
+      }
+
+      if (existingDoc.status === 'PROCESSING') {
+        res.status(200).json({
+          message: 'Document is currently processing',
+          documentId: existingDoc.id,
+          status: existingDoc.status
+        });
+        return;
+      }
+
+      // If FAILED or pending (orphaned), requeue
+      if (existingDoc.status === 'FAILED' || existingDoc.status === 'pending' || existingDoc.status === 'PENDING') {
+        console.log('REQUEUING DOCUMENT:', existingDoc.id);
+        
+        await prisma.document.update({
+          where: { id: existingDoc.id },
+          data: { status: 'pending', errorMessage: null }
+        });
+
+        await ingestionQueue.add('process', {
+          documentId: existingDoc.id,
+          filePath: existingDoc.filePath
+        });
+
+        res.status(202).json({
+          message: 'Document requeued for processing',
+          documentId: existingDoc.id,
+          status: 'pending'
+        });
+        return;
+      }
+
+      // Fallback
       res.status(200).json({
         message: 'Document already exists',
         documentId: existingDoc.id,
         status: existingDoc.status
       });
-
       return;
     }
-
     // Upload folder
     const uploadDir = path.join(__dirname, '../../uploads');
 

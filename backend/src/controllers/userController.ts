@@ -496,64 +496,13 @@ export const googleLogin = async (req: Request, res: Response) => {
 };
 
 export const updateUserLimit = async (req: Request, res: Response) => {
-  try {
-    const userJwt = req.user as JwtPayload;
-    if (!userJwt || typeof userJwt !== 'object' || !userJwt.id) {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
-
-    const { limitType } = req.body; // 'message' or 'email'
-    
-    if (!limitType || !['message', 'email'].includes(limitType)) {
-      return res.status(400).json({ error: 'Invalid limit type. Must be "message" or "email"' });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: userJwt.id },
-      select: { 
-        messageLimit: true, 
-        emailLimit: true, 
-        plan: true 
-      }
-    });
-
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Check if limit is already exhausted
-    const currentLimit = limitType === 'message' ? user.messageLimit : user.emailLimit;
-    if (currentLimit <= 0) {
-      return res.status(429).json({ 
-        error: `${limitType} limit exceeded`,
-        message: `You have reached your ${limitType} limit. Please upgrade to continue using the service.`
-      });
-    }
-
-    // Decrement the appropriate limit
-    const updateData = limitType === 'message' 
-      ? { messageLimit: user.messageLimit - 1 }
-      : { emailLimit: user.emailLimit - 1 };
-
-    const updatedUser = await prisma.user.update({
-      where: { id: userJwt.id },
-      data: updateData,
-      select: { 
-        messageLimit: true, 
-        emailLimit: true, 
-        plan: true 
-      }
-    });
-
-    res.json({ 
-      success: true,
-      [limitType === 'message' ? 'messageLimit' : 'emailLimit']: updatedUser[limitType === 'message' ? 'messageLimit' : 'emailLimit'],
-      plan: updatedUser.plan
-    });
-  } catch (error) {
-    console.error('Update user limit error:', error);
-    res.status(500).json({ error: 'Failed to update user limit' });
-  }
+  // Self-hosted unrestricted mode
+  res.json({ 
+    success: true,
+    messageLimit: 999999,
+    emailLimit: 999999,
+    plan: 'Paid'
+  });
 };
 
 export default { signup, login, refreshToken, getCurrentUser, changePassword, googleLogin, getUserLimits, updateUserLimit };

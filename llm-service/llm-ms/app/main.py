@@ -9,12 +9,19 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 import os
 import time
+import sys
+
+# Ensure stdout and stderr use utf-8 to prevent charmap errors with emojis on Windows
+if sys.stdout.encoding.lower() != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+if sys.stderr.encoding.lower() != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8')
 
 # Load environment variables from .env file
 load_dotenv()
 
 # Import routes
-from app.routes import chat, rag, internal_memory
+from app.routes import chat, rag, internal_memory, internal_documents, internal_discussions
 
 # Create FastAPI application
 app = FastAPI(
@@ -57,6 +64,8 @@ async def log_requests(request: Request, call_next):
 app.include_router(chat.router, prefix="/api/llm", tags=["LLM"])
 app.include_router(rag.router, prefix="/api/rag", tags=["RAG"])
 app.include_router(internal_memory.router, prefix="/internal/memory", tags=["Internal Memory"])
+app.include_router(internal_documents.router, prefix="/internal/documents", tags=["Internal Documents"])
+app.include_router(internal_discussions.router, prefix="/internal/discussions", tags=["Internal Discussions"])
 
 # Root endpoint
 @app.get("/")

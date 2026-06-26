@@ -21,3 +21,7 @@ chromadb==0.4.24
 # Optional but Recommended
 httpx==0.28.0          # Modern async HTTP client (alternative to requests)
 python-multipart==0.0.17  # For file uploads if needed
+
+# PDF Extraction
+langchain-community
+PyMuPDF

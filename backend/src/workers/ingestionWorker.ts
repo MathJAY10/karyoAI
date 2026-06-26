@@ -4,7 +4,8 @@ import prisma from '../lib/prisma';
 import { INGESTION_QUEUE_NAME } from '../config/bullmq';
 import path from 'path';
 
-const FASTAPI_URL = process.env.FASTAPI_URL || 'http://127.0.0.1:8001/internal/documents/ingest';
+const LLM_SERVICE_URL = process.env.LLM_SERVICE_URL || 'http://127.0.0.1:8005';
+const FASTAPI_URL = process.env.FASTAPI_URL || `${LLM_SERVICE_URL}/internal/documents/ingest`;
 console.log("🚀 Ingestion Worker Booting...");
 console.log("Queue Name:", INGESTION_QUEUE_NAME);
 export const ingestionWorker = new Worker(

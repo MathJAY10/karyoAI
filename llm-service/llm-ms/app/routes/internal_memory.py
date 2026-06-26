@@ -18,6 +18,7 @@ class EmbedMemoryRequest(BaseModel):
     userId: int
     sessionId: int
     content: str
+    memoryType: str = "UNKNOWN"
 
 @router.post("/extract")
 async def extract_memory(request: ExtractMemoryRequest):
@@ -44,10 +45,11 @@ async def embed_memory(request: EmbedMemoryRequest):
             memory_fact_id=request.memoryFactId,
             user_id=request.userId,
             session_id=request.sessionId,
-            content=request.content
+            content=request.content,
+            memory_type=request.memoryType
         )
         if not success:
-            raise Exception("Failed to store embedding in ChromaDB")
+            raise Exception(f"Failed to store embedding in ChromaDB. Check FastAPI server logs for the exact exception.")
         return {"status": "success"}
     except Exception as e:
         logger.error(f"Failed to embed memory: {e}")

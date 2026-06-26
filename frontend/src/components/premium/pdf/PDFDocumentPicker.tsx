@@ -109,7 +109,13 @@ const PDFDocumentPicker: React.FC = () => {
           const res = await fetch(`${API_BASE}/rag/documents/${docId}/status`, {
             headers: authHeader(),
           });
+          
+          if (res.status === 304) {
+            // Not modified, no state update needed
+            return;
+          }
           if (!res.ok) return;
+          
           const { status } = await res.json();
 
           if (status === 'READY') {
@@ -123,19 +129,23 @@ const PDFDocumentPicker: React.FC = () => {
             clearInterval(timer);
             pollTimers.current.delete(docId);
 
-            setUploadingDocs((prev) =>
-              prev.map((d) => (d.id === docId ? { ...d, status: 'FAILED' } : d))
-            );
+            setUploadingDocs((prev) => {
+              const doc = prev.find(d => d.id === docId);
+              if (doc && doc.status === 'FAILED') return prev;
+              return prev.map((d) => (d.id === docId ? { ...d, status: 'FAILED' } : d));
+            });
           } else {
             // still processing — update badge
-            setUploadingDocs((prev) =>
-              prev.map((d) => (d.id === docId ? { ...d, status: 'PROCESSING' } : d))
-            );
+            setUploadingDocs((prev) => {
+              const doc = prev.find(d => d.id === docId);
+              if (doc && doc.status === 'PROCESSING') return prev;
+              return prev.map((d) => (d.id === docId ? { ...d, status: 'PROCESSING' } : d));
+            });
           }
         } catch (err) {
           console.error(`Poll error for doc ${docId}:`, err);
         }
-      }, 3000);
+      }, 5000);
 
       pollTimers.current.set(docId, timer);
     },

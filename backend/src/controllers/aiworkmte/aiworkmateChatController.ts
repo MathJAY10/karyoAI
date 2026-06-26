@@ -58,18 +58,104 @@ export const sendMessage = async (req: Request, res: Response) => {
       .map((msg: any) => `${msg.sender === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
       .join('\n\n');
     
-    // Use self-hosted LLM instead of OpenAI
-    const systemPrompt = 'You are AI Workmate, a helpful and knowledgeable assistant. Provide accurate, clear, and useful responses to help users with their tasks, questions, and projects.';
-    const userPrompt = conversationContext 
-      ? `${conversationContext}\n\nUser: ${message}\n\nProvide a helpful response:`
-      : message;
+    // Import memoryService (ensure it is imported at the top)
+    const { memoryService } = require('../../services/memoryService');
     
-    const aiMessage = await llmService.simpleCompletion(
-      userPrompt,
-      systemPrompt,
-      0.7, // temperature - balanced creativity
-      1000  // max tokens - enough for detailed responses
-    );
+    // INTENT ROUTING (Regex-based)
+    const msgLower = message.toLowerCase();
+    let aiMessage = '';
+    
+    const listRegex = /(?:what topics have we discussed|what do you know about me|what have we talked about recently)/i;
+    const summarizeRegex = /(?:what have i learned|what did i learn|summarize my learnings) (?:about|on) (.+?)(?:\?|$)/i;
+    const searchRegex = /(?:did we discuss|have we discussed|have we talked about|do you remember|what did i discuss about|tell me about my previous discussion on|what discussion did i do on) (.+?)(?:\?|$)/i;
+
+    const listMatch = msgLower.match(listRegex);
+    const sumMatch = msgLower.match(summarizeRegex);
+    const searchMatch = msgLower.match(searchRegex);
+
+    // 1. LIST_TOPICS
+    if (listMatch) {
+      console.log(`[MEMORY_ROUTE] LIST_TOPICS`);
+      aiMessage = await memoryService.listKnownTopics(userId);
+    }
+    // 2. SUMMARIZE_TOPIC
+    else if (sumMatch) {
+      const topic = sumMatch[1].trim();
+      console.log(`[MEMORY_ROUTE] SUMMARIZE_TOPIC | Topic: "${topic}"`);
+      aiMessage = await memoryService.summarizeLearnings(topic, userId);
+    }
+    // 3. SEARCH_MEMORY
+    else if (searchMatch) {
+      const topic = searchMatch[1].trim();
+      console.log(`[MEMORY_ROUTE] SEARCH_MEMORY | Topic: "${topic}"`);
+      
+      const memories = await memoryService.searchMemory(topic, userId);
+      let memoryContext = '';
+      if (!memories || memories.length === 0) {
+        console.log(`[MEMORY_EMPTY] No memories found`);
+        memoryContext = 'Relevant Memories:\n* None found.';
+      } else {
+        console.log(`[MEMORY_INJECTION] Injecting memories into prompt`);
+        memoryContext = `Relevant Memories:\n${memories.map((m: any, i: number) => `* ${m}`).join('\n')}`;
+      }
+
+      console.log(`[MEMORY_CONTEXT_DUMP]\n${memoryContext}`);
+
+      const activeWorkspace = await prisma.workspace.findFirst({
+        where: { userId },
+        include: { documents: true }
+      });
+      let workspaceContext = '';
+      if (activeWorkspace) {
+        const docNames = activeWorkspace.documents.map((d: any) => d.fileName).join(', ');
+        workspaceContext = `\nCurrent Workspace ID: ${activeWorkspace.id}\nAvailable Uploaded Documents: ${docNames || 'None'}`;
+      }
+
+      const systemPrompt = `You are AI Workmate, a helpful and knowledgeable assistant. 
+Provide accurate, clear, and useful responses to help users with their tasks, questions, and projects.
+
+Instructions:
+Use memories only if relevant.
+Do not invent memories.
+If no memory exists, say so.
+If you need to search past discussions, use your chat discussion recall tool with the Current Workspace ID.
+${workspaceContext}
+
+${memoryContext}`;
+
+      const userPrompt = conversationContext 
+        ? `${conversationContext}\n\nUser: ${message}\n\nProvide a helpful response:`
+        : message;
+      
+      // SEARCH_MEMORY: memory context is already injected — do NOT expose MCP tools
+      // to prevent the model from leaking tool-call JSON into content.
+      aiMessage = await llmService.simpleCompletion(userPrompt, systemPrompt, 0.7, 1000, false);
+    }
+    // 4. NORMAL CHAT
+    else {
+      console.log('[INTENT] NORMAL CHAT detected');
+      
+      const activeWorkspace = await prisma.workspace.findFirst({
+        where: { userId },
+        include: { documents: true }
+      });
+      let workspaceContext = '';
+      if (activeWorkspace) {
+        const docNames = activeWorkspace.documents.map((d: any) => d.fileName).join(', ');
+        workspaceContext = `\nCurrent Workspace ID: ${activeWorkspace.id}\nAvailable Uploaded Documents: ${docNames || 'None'}`;
+      }
+
+      const systemPrompt = `You are AI Workmate, a helpful and knowledgeable assistant. Provide accurate, clear, and useful responses to help users with their tasks, questions, and projects.
+If the user specifically asks to recall past chat discussions or query their memory profile, use the appropriate tools.
+For normal knowledge, explanation, architecture, or coding questions, answer directly.
+Do NOT output raw JSON, tool schemas, or fake tool payloads to the user under any circumstances.
+${workspaceContext}`;
+      const userPrompt = conversationContext 
+        ? `${conversationContext}\n\nUser: ${message}\n\nProvide a helpful response:`
+        : message;
+      
+      aiMessage = await llmService.simpleCompletion(userPrompt, systemPrompt, 0.7, 1000);
+    }
     
     console.log('AI Workmate Response:', aiMessage);
     

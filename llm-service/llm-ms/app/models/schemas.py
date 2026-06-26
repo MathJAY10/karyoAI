@@ -17,6 +17,7 @@ class ChatRequest(BaseModel):
     temperature: Optional[float] = Field(0.7, ge=0.0, le=2.0, description="Creativity (0=deterministic, 2=very creative)")
     max_tokens: Optional[int] = Field(512, ge=1, le=4096, description="Maximum response length")
     model: Optional[str] = Field(None, description="Override default model")
+    use_tools: Optional[bool] = Field(True, description="Whether to expose MCP tools to the LLM (set False for memory-injected or plain completions)")
 
 class ChatResponse(BaseModel):
     """Response from chat endpoint"""

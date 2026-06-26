@@ -92,18 +92,21 @@ class LLMService {
    * @param messages - Array of chat messages (system, user, assistant)
    * @param temperature - Randomness (0.0-1.0), default 0.7
    * @param maxTokens - Max response length, default 500
+   * @param useTools - Enable tool usage, default true
    * @returns Generated response text
    */
   async chatCompletion(
     messages: ChatMessage[],
     temperature: number = 0.7,
-    maxTokens: number = 500
+    maxTokens: number = 500,
+    useTools: boolean = true
   ): Promise<string> {
     try {
-      const payload: ChatCompletionRequest = {
+      const payload: any = {
         messages,
         temperature,
         max_tokens: maxTokens,
+        use_tools: useTools,
       };
 
       console.log('🔵 Sending request to LLM service:', `${LLM_SERVICE_URL}/api/llm/chat`);
@@ -151,7 +154,8 @@ class LLMService {
     prompt: string,
     systemPrompt?: string,
     temperature: number = 0.7,
-    maxTokens: number = 500
+    maxTokens: number = 500,
+    useTools: boolean = true
   ): Promise<string> {
     const messages: ChatMessage[] = [];
 
@@ -169,7 +173,7 @@ class LLMService {
       content: prompt,
     });
 
-    return this.chatCompletion(messages, temperature, maxTokens);
+    return this.chatCompletion(messages, temperature, maxTokens, useTools);
   }
 
   /**

@@ -40,24 +40,21 @@ class QueryService:
             4. Return top-k chunks with metadata and relevance scores
         """
         try:
-            # 1. Skip Ollama embedding if none provided to allow ChromaDB default embedding (MiniLM) to run
-            # This matches the ingestion worker which uses Chroma default MiniLM.
+            # 1. Always generate query embeddings using embedding_service
+            if not query_embedding:
+                print(f"[RETRIEVE_QUERY] {query}")
+                print(f"[RETRIEVE_EMBED_MODEL] {embedding_service.EMBEDDING_MODEL}")
+                single_embedding = await embedding_service.generate_embedding(query)
+                query_embedding = [single_embedding]
+                print(f"[RETRIEVE_EMBED_DIMENSION] {len(single_embedding)}")
 
             # 2. Query ChromaDB (semantic search)
-            if query_embedding:
-                results = chroma_service.query(
-                    collection_name=collection_name,
-                    query_embeddings=query_embedding,
-                    n_results=n_results,
-                    where=metadata_filter
-                )
-            else:
-                results = chroma_service.query(
-                    collection_name=collection_name,
-                    query_texts=[query],
-                    n_results=n_results,
-                    where=metadata_filter
-                )
+            results = chroma_service.query(
+                collection_name=collection_name,
+                query_embeddings=query_embedding,
+                n_results=n_results,
+                where=metadata_filter
+            )
 
             # 3. Format results
             formatted_results = []
@@ -166,7 +163,8 @@ ANSWER:"""
             response = await ollama_service.chat(
                 messages=messages,
                 temperature=temperature,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
+                use_tools=False
             )
 
             print(f"✅ RAG query completed with {len(context_chunks)} context chunks")

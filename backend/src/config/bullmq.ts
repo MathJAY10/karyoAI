@@ -30,3 +30,18 @@ export const memoryQueue = new Queue(MEMORY_EXTRACTION_QUEUE_NAME, {
     removeOnFail: false,
   },
 });
+
+export const DISCUSSION_QUEUE_NAME = 'discussion-summary';
+
+export const discussionQueue = new Queue(DISCUSSION_QUEUE_NAME, {
+  connection: redisConnection as any,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: {
+      type: 'exponential',
+      delay: 5000,
+    },
+    removeOnComplete: true,
+    removeOnFail: false,
+  },
+});

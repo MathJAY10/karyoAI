@@ -48,7 +48,8 @@ async def chat_completion(request: ChatRequest):
             messages=messages,
             temperature=request.temperature,
             max_tokens=request.max_tokens,
-            model=request.model
+            model=request.model,
+            use_tools=request.use_tools if request.use_tools is not None else True
         )
         
         # Return formatted response

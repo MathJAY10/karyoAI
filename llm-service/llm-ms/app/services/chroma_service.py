@@ -34,7 +34,7 @@ class ChromaDBService:
             _ = self.client.list_collections()
             return True
         except Exception as e:
-            print(f"❌ ChromaDB health check failed: {e}")
+            print(f"[ERROR] ChromaDB health check failed: {e}")
             return False
 
     def get_or_create_collection(self, collection_name: str, metadata: Optional[Dict] = None) -> str:
@@ -53,16 +53,17 @@ class ChromaDBService:
             safe_name = collection_name.replace(" ", "_").replace("-", "_").lower()[:63]
             
             # Get or create collection
-            collection = self.client.get_or_create_collection(
-                name=safe_name,
-                metadata=metadata or {}
-            )
+            kwargs = {"name": safe_name}
+            if metadata:
+                kwargs["metadata"] = metadata
+                
+            collection = self.client.get_or_create_collection(**kwargs)
             
             self.collections[safe_name] = collection
-            print(f"✅ Collection '{safe_name}' ready")
+            print(f"[SUCCESS] Collection '{safe_name}' ready")
             return safe_name
         except Exception as e:
-            print(f"❌ Error creating/getting collection: {e}")
+            print(f"[ERROR] Error creating/getting collection: {e}")
             raise
 
     def add_documents(
@@ -93,9 +94,9 @@ class ChromaDBService:
                 embeddings=embeddings
             )
             
-            print(f"✅ Added {len(documents)} documents to '{collection_name}'")
+            print(f"[SUCCESS] Added {len(documents)} documents to '{collection_name}'")
         except Exception as e:
-            print(f"❌ Error adding documents: {e}")
+            print(f"[ERROR] Error adding documents: {e}")
             raise
 
     def query(
@@ -138,7 +139,7 @@ class ChromaDBService:
             
             return results
         except Exception as e:
-            print(f"❌ Error querying collection: {e}")
+            print(f"[ERROR] Error querying collection: {e}")
             raise
 
     def get_collection(self, collection_name: str):
@@ -159,9 +160,9 @@ class ChromaDBService:
             if safe_name in self.collections:
                 del self.collections[safe_name]
             
-            print(f"✅ Deleted collection '{safe_name}'")
+            print(f"[SUCCESS] Deleted collection '{safe_name}'")
         except Exception as e:
-            print(f"❌ Error deleting collection: {e}")
+            print(f"[ERROR] Error deleting collection: {e}")
             raise
 
     def list_collections(self) -> List[str]:
@@ -170,7 +171,7 @@ class ChromaDBService:
             collections = self.client.list_collections()
             return [c.name for c in collections]
         except Exception as e:
-            print(f"❌ Error listing collections: {e}")
+            print(f"[ERROR] Error listing collections: {e}")
             return []
 
     def get_collection_stats(self, collection_name: str) -> Dict:
@@ -184,7 +185,7 @@ class ChromaDBService:
                 "document_count": count
             }
         except Exception as e:
-            print(f"❌ Error getting collection stats: {e}")
+            print(f"[ERROR] Error getting collection stats: {e}")
             raise
 
     def delete_documents(self, collection_name: str, ids: List[str]) -> None:
@@ -192,9 +193,9 @@ class ChromaDBService:
         try:
             collection = self.get_collection(collection_name)
             collection.delete(ids=ids)
-            print(f"✅ Deleted {len(ids)} documents from '{collection_name}'")
+            print(f"[SUCCESS] Deleted {len(ids)} documents from '{collection_name}'")
         except Exception as e:
-            print(f"❌ Error deleting documents: {e}")
+            print(f"[ERROR] Error deleting documents: {e}")
             raise
 
 

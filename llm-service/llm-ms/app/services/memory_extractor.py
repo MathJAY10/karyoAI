@@ -23,29 +23,61 @@ class MemoryExtractor:
         except Exception as e:
             logger.error(f"Failed to create memory collection: {e}")
 
-    async def extract_facts(self, conversation_context: str) -> List[str]:
+    async def extract_facts(self, conversation_context: str) -> List[Dict[str, str]]:
         """Call Ollama to extract atomic facts from the conversation context."""
         logger.info("[EXTRACTION] Starting fact extraction from conversation context")
-        prompt = f"""You are a Knowledge Memory Extractor.
-Analyze the following conversation and extract ATOMIC learning facts.
+        prompt = f"""You are a User Profile & Memory Extractor.
+Analyze the following conversation and extract ATOMIC facts about the USER.
 
 CRITICAL RULES:
-1. Every fact MUST be a complete, self-contained sentence.
-2. Every fact MUST explicitly state the primary subject, technology, or domain being discussed. 
-3. DO NOT use pronouns (e.g. "it", "they").
-4. Extract from the user's perspective.
-5. Return ONLY a valid JSON array of strings. Do not add markdown blocks or conversational text.
+1. Extract ONLY user profile information, such as their interests, projects, or background.
+2. If the user asks about specific topics (e.g., "DSA", "computer networks", "Kafka", "Redis"), infer and extract it as an INTEREST.
+3. Ignore the AI's textbook explanations, but capture the user's implicit interests based on their questions.
+4. Every fact must start with "User".
+5. Use exactly one enum for the "type" field:
+IDENTITY
+PREFERENCE
+PROJECT
+GOAL
+DECISION
+CONSTRAINT
+INTEREST
+UNKNOWN
 
-BAD: "User learned about consumer groups."
-GOOD: "User learned about consumer groups within Apache Kafka."
+6. You MUST return a JSON object with a single key "facts" containing an array of your extractions.
 
-BAD: "User prefers to use Postgres for it."
-GOOD: "User prefers to use PostgreSQL for relational databases."
+If there is absolutely no useful user information, return an empty array EXACTLY like this:
+{{
+  "facts": []
+}}
+
+Example 1:
+{{
+  "facts": [
+    {{
+      "type": "INTEREST",
+      "content": "User is interested in learning about Data Structures and Algorithms (DSA)."
+    }},
+    {{
+      "type": "INTEREST",
+      "content": "User is interested in learning Apache Kafka Consumer Groups."
+    }},
+    {{
+      "type": "INTEREST",
+      "content": "User is interested in learning Redis Streams."
+    }}
+  ]
+}}
+
+Example 2 (No useful info):
+{{
+  "facts": []
+}}
 
 Conversation:
 {conversation_context}
 
-Output JSON array:"""
+Output JSON object:"""
 
         try:
             async with httpx.AsyncClient() as client:
@@ -57,19 +89,54 @@ Output JSON array:"""
                         "stream": False,
                         "format": "json"
                     },
-                    timeout=60.0
+                    timeout=120.0
                 )
                 response.raise_for_status()
                 result = response.json()
                 
-                # Parse JSON array
-                facts = json.loads(result.get("response", "[]"))
-                if not isinstance(facts, list):
-                    logger.warning("[EXTRACTION] Ollama did not return a list. Fallback to empty list.")
-                    return []
+                raw_response = result.get("response", "[]")
+                logger.info(f"[MEMORY_EXTRACTOR_RAW] {raw_response}")
                 
-                logger.info(f"[EXTRACTION] Ollama extracted {len(facts)} atomic facts.")
-                return [str(f) for f in facts if f]
+                # Parse JSON array/object safely
+                facts = []
+                try:
+                    parsed = json.loads(raw_response)
+                    if isinstance(parsed, dict):
+                        facts = parsed.get("facts", [])
+                    elif isinstance(parsed, list):
+                        facts = parsed
+                except json.JSONDecodeError as e:
+                    logger.error(f"[EXTRACTION] JSON parsing failed: {e}")
+                
+                if not isinstance(facts, list):
+                    logger.warning("[EXTRACTION] Ollama did not return a valid list structure. Fallback to empty list.")
+                    facts = []
+                
+                logger.info(f"[MEMORY_EXTRACTOR_PARSED] Count before validation: {len(facts)}")
+                
+                VALID_TYPES = {
+                    "IDENTITY", "PREFERENCE", "PROJECT", "GOAL", 
+                    "DECISION", "CONSTRAINT", "INTEREST", "UNKNOWN"
+                }
+                
+                validated_facts = []
+                for f in facts:
+                    if not isinstance(f, dict):
+                        continue
+                    
+                    fact_type = str(f.get("type", "UNKNOWN")).upper()
+                    if fact_type not in VALID_TYPES:
+                        fact_type = "UNKNOWN"
+                        
+                    content = str(f.get("content", "")).strip()
+                    if content:
+                        validated_facts.append({
+                            "type": fact_type,
+                            "content": content
+                        })
+                
+                logger.info(f"[MEMORY_EXTRACTOR_FACT_COUNT] Ollama extracted {len(validated_facts)} atomic facts.")
+                return validated_facts
         except Exception as e:
             logger.error(f"[EXTRACTION] Ollama extraction failed: {e}")
             return []
@@ -115,7 +182,7 @@ Output JSON array:"""
         # 2. Deduplicate
         novel_facts = []
         for fact in extracted_facts:
-            if not await self.is_duplicate(fact, user_id):
+            if not await self.is_duplicate(fact["content"], user_id):
                 novel_facts.append(fact)
                 
         logger.info(f"[EXTRACTION] Completed processing for session {session_id}. Extracted {len(extracted_facts)} facts. {len(novel_facts)} are novel.")
@@ -126,7 +193,7 @@ Output JSON array:"""
             "novelFacts": novel_facts
         }
 
-    async def store_embedding(self, memory_fact_id: int, user_id: int, session_id: int, content: str):
+    async def store_embedding(self, memory_fact_id: int, user_id: int, session_id: int, content: str, memory_type: str = "UNKNOWN"):
         """Store the fact embedding into ChromaDB after Node.js saves it to Prisma."""
         try:
             embedding = await embedding_service.generate_embedding(content)
@@ -138,7 +205,8 @@ Output JSON array:"""
                 "memoryFactId": memory_fact_id,
                 "userId": user_id,
                 "chatSessionId": session_id,
-                "sourceType": "ai_chat"
+                "sourceType": "ai_chat",
+                "memoryType": memory_type
             }
             
             chroma_service.add_documents(
@@ -148,7 +216,7 @@ Output JSON array:"""
                 metadatas=[metadata],
                 ids=[doc_id]
             )
-            logger.info(f"[EMBEDDING] Indexed fact {memory_fact_id} to ChromaDB.")
+            logger.info(f"[EMBEDDING] Indexed fact {memory_fact_id} of type {memory_type} to ChromaDB.")
             return True
         except Exception as e:
             logger.error(f"[CRITICAL] ChromaDB insertion failed for fact {memory_fact_id}: {e}")

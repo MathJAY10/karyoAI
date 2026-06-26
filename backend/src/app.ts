@@ -4,6 +4,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 // Removed dynamic sitemap/robots serving; now served statically from frontend
 import './workers/memoryWorker'; // Start the MemoryWorker
+import './workers/ingestionWorker'; // Start the IngestionWorker
 
 dotenv.config();
 

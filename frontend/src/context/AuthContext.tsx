@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         const data = await fetchCurrentUser(storedToken);
         if (data && data.user) {
-          const userWithPremium = { ...data.user, isPremium: data.user.plan === 'Paid' };
+          const userWithPremium = { ...data.user, isPremium: true };
           setUser(userWithPremium);
           setToken(storedToken);
         } else {
@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [checkAuth]);
 
   const login = useCallback((user: User, token: string) => {
-    const userWithPremium = { ...user, isPremium: user.plan === 'Paid' };
+    const userWithPremium = { ...user, isPremium: true };
     setUser(userWithPremium);
     setToken(token);
     localStorage.setItem('user', JSON.stringify(userWithPremium));

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../../lib/prisma';
 import ragService from '../../services/ragService';
-import { memoryQueue } from '../../config/bullmq';
+import { memoryQueue, discussionQueue } from '../../config/bullmq';
 
 export const chatWithPDF = async (req: Request, res: Response) => {
   try {
@@ -130,24 +130,35 @@ export const chatWithPDF = async (req: Request, res: Response) => {
         }
       });
       
-      // 5. Debounce Memory Extraction Job
+      // Enqueue a debounced rolling summary job for this PDF chat session
       try {
-        const jobId = `extract_session_${currentSessionId}`;
-        const existingJob = await memoryQueue.getJob(jobId);
-        if (existingJob) {
-          await memoryQueue.remove(jobId);
-          console.log(`[MEMORY_QUEUE] Job Cancelled: ${jobId}`);
-        }
+        // (Using static discussionQueue import from top of file)
+        const jobId = `discussion_summary_session_${currentSessionId}`;
         
-        await memoryQueue.add(
-          'extract',
-          { sessionId: currentSessionId, userId, type: 'pdf_chat' },
-          { jobId, delay: 3 * 60 * 1000 } // 3 minutes
+        // Add job with a 3-minute delay. If a job with this ID already exists (from a previous message),
+        // we can remove it and re-add to reset the debounce timer, or just let it run. 
+        // BullMQ doesn't natively "reset" delays on same jobId if it's delayed, so we remove and re-add.
+        await discussionQueue.remove(jobId);
+        
+        await discussionQueue.add(
+          'summarize-pdf-chat',
+          {
+            sessionId: currentSessionId,
+            sourceType: 'pdf_chat'
+          },
+          {
+            jobId,
+            delay: 3 * 60 * 1000, // 3 minutes debounce
+          }
         );
-        console.log(`[MEMORY_QUEUE] Job Scheduled: ${jobId} (Delay: 180s)`);
+        console.log(`[DISCUSSION_QUEUE] Debounced summary job ${jobId} for 3 minutes`);
       } catch (queueError) {
-        console.error('[CRITICAL] Failed to queue memory extraction:', queueError);
+        console.error('Failed to enqueue discussion summary job:', queueError);
       }
+      
+      // 5. Memory Extraction Disabled for PDF Chat
+      // We no longer extract memory from PDF chats to prevent
+      // document facts from overriding personal user profiles.
       
       // Update user limit
       try {
